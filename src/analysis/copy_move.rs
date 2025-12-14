@@ -318,7 +318,7 @@ impl CopyMoveDetector {
         
         let dx = (x1 as i32 - x0 as i32).abs();
         let dy = -(y1 as i32 - y0 as i32).abs();
-        let sz = if x0 < x1 { 1i32 } else { -1i32 };
+        let sx = if x0 < x1 { 1i32 } else { -1i32 };
         let sy = if y0 < y1 { 1i32 } else { -1i32 };
         let mut err = dx + dy;
         
@@ -337,7 +337,7 @@ impl CopyMoveDetector {
             let e2 = 2 * err;
             if e2 >= dy {
                 err += dy;
-                x += dx;
+                x += sx;
             }
             if e2 <= dx {
                 err += dx;

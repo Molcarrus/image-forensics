@@ -43,7 +43,7 @@ pub fn array_to_gray(arr: &Array2<f64>) -> GrayImage {
     image
 }
 
-pub fn gaussian_blue_3x3(image: &GrayImage) -> GrayImage {
+pub fn gaussian_blur_3x3(image: &GrayImage) -> GrayImage {
     let kernel = [
         [1.0/16.0, 2.0/16.0, 1.0/16.0],
         [2.0/16.0, 4.0/16.0, 2.0/16.0],
