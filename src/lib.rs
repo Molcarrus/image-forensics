@@ -2,7 +2,7 @@ use std::path::Path;
 
 use image::{DynamicImage, GrayImage, RgbImage};
 
-use crate::error::Result;
+use crate::{analysis::{copy_move::CopyMoveDetector, ela::ElaAnalyzer, jpeg_analysis::JpegAnalyzer, noise::NoiseAnalyzer}, error::{ForensicsError, Result}, metadata::exif::ExifExtractor};
 
 pub mod error;
 pub mod image_utils;
@@ -62,6 +62,36 @@ impl ForensicsAnalyzer {
     pub fn with_config(mut self, config: AnalysisConfig) -> Self {
         self.config = config;
         self 
+    }
+    
+    pub fn ela(&self, quality: u8) -> Result<ElaResult> {
+        let analyzer = ElaAnalyzer::new(quality);
+        analyzer.analyze(&self.original)
+    }
+    
+    pub fn detect_cop_move(&self) -> Result<CopyMoveResult> {
+        let detector = CopyMoveDetector::new(self.config.block_size, self.config.similarity_threshold, self.config.min_match_distance)?;
+        detector.detect(&self.original)
+    }
+    
+    pub fn analyze_noise(&self) -> Result<NoiseResult> {
+        let analyzer = NoiseAnalyzer::new();
+        analyzer.analyze(&self.original)
+    }
+    
+    pub fn analyze_jpeg(&self) -> Result<JpegAnalysisResult> {
+        let analyzer = JpegAnalyzer::new();
+        analyzer.analyze(&self.original)
+    }
+    
+    pub fn extract_metadata(&self) -> Result<MetadataResult> {
+        if let Some(ref path) = self.path {
+            ExifExtractor::extract(path)
+        } else {
+            Err(ForensicsError::MetadataError(
+                "No file patha available for metasata extraction".into()
+            ))
+        }
     }
 }
 
