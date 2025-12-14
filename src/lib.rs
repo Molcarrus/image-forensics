@@ -71,7 +71,7 @@ pub struct ElaResult {
     pub max_difference: f64,
     pub mean_difference: f64,
     pub std_deviation: f64,
-    pub suspicious_region: Vec<SRegion>
+    pub suspicious_regions: Vec<SRegion>
 }
 
 impl ElaResult {
