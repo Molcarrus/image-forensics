@@ -7,6 +7,7 @@ use crate::error::Result;
 pub mod error;
 pub mod image_utils;
 pub mod analysis;
+pub mod metadata;
 
 #[derive(Debug, Clone)]
 pub struct AnalysisConfig {
