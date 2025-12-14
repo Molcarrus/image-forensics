@@ -84,7 +84,7 @@ impl ElaResult {
 #[derive(Debug, Clone)]
 pub struct CopyMoveResult {
     pub matches: Vec<MatchPair>,
-    pub visulaization: RgbImage,
+    pub visualization: RgbImage,
     pub confidence: f64,
 }
 
