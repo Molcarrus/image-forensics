@@ -8,6 +8,7 @@ pub mod error;
 pub mod image_utils;
 pub mod analysis;
 pub mod metadata;
+pub mod report;
 
 #[derive(Debug, Clone)]
 pub struct AnalysisConfig {
@@ -91,6 +92,61 @@ impl ForensicsAnalyzer {
             Err(ForensicsError::MetadataError(
                 "No file patha available for metasata extraction".into()
             ))
+        }
+    }
+    
+    pub fn full_analysis(&self) -> Result<FullAnalysisReport> {
+        let ela = self.ela(self.config.ela_quality)?;
+        let copy_move = self.detect_cop_move()?;
+        let noise = self.analyze_noise()?;
+        let jpeg = self.analyze_jpeg()?;
+        let metadata = self.extract_metadata().ok();
+        
+        Ok(FullAnalysisReport { 
+            ela: ela.clone(), 
+            copy_move: copy_move.clone(), 
+            noise: noise.clone(), 
+            jpeg: jpeg.clone(), 
+            metadata, 
+            tampering_ability: Self::calculate_tampering_probability(
+                &ela, &copy_move, &noise, &jpeg
+            ) 
+        })
+    }
+    
+    fn calculate_tampering_probability(
+        ela: &ElaResult,
+        copy_move: &CopyMoveResult,
+        noise: &NoiseResult, 
+        jpeg: &JpegAnalysisResult
+    ) -> f64 {
+        let mut score = 0.0;
+        let mut weight_sum = 0.0;
+        
+        if ela.max_difference > 50.0 {
+            score += 0.3 * (ela.max_difference / 255.0).min(1.0);
+            weight_sum += 0.3;
+        }
+        
+        if !copy_move.matches.is_empty() {
+            score += 0.4 * (copy_move.matches.len() as f64 / 100.0).min(1.0);
+            weight_sum += 0.4;
+        }
+        
+        if noise.inconsistency_score > 0.3 {
+            score += 0.2 * noise.inconsistency_score;
+            weight_sum += 0.2;
+        }
+        
+        if jpeg.ghost_detected {
+            score += 0.1;
+            weight_sum += 0.1;
+        }
+        
+        if weight_sum > 0.0 {
+            score / weight_sum
+        } else {
+            0.0
         }
     }
 }
