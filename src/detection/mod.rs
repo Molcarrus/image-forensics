@@ -1,3 +1,5 @@
+pub mod splicing;
+
 use image::RgbImage;
 use serde::{Deserialize, Serialize};
 
@@ -110,7 +112,7 @@ impl DetectionResult {
     }
 }
 
-pub trait Detectpr {
+pub trait Detector {
     fn detect(&self, image: &image::DynamicImage) -> Result<DetectionResult>;
     
     fn name(&self) -> &str;
