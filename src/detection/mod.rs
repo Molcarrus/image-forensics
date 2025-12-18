@@ -1,4 +1,5 @@
 pub mod splicing;
+pub mod tampering;
 
 use image::RgbImage;
 use serde::{Deserialize, Serialize};
