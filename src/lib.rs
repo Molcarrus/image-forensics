@@ -1,6 +1,7 @@
 use std::path::Path;
 
 use image::{DynamicImage, GrayImage, RgbImage};
+use serde::{Deserialize, Serialize};
 
 use crate::{analysis::{copy_move::CopyMoveDetector, ela::ElaAnalyzer, jpeg_analysis::JpegAnalyzer, noise::NoiseAnalyzer}, error::{ForensicsError, Result}, metadata::exif::ExifExtractor};
 
@@ -9,6 +10,7 @@ pub mod image_utils;
 pub mod analysis;
 pub mod metadata;
 pub mod report;
+pub mod detection;
 
 #[derive(Debug, Clone)]
 pub struct AnalysisConfig {
@@ -182,7 +184,7 @@ pub struct MatchPair {
     pub similarity: f64,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct SRegion {
     pub x: u32,
     pub y: u32,
