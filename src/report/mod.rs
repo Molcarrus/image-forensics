@@ -1,3 +1,5 @@
+pub mod visualization;
+
 use serde::Serialize;
 
 use crate::FullAnalysisReport;
