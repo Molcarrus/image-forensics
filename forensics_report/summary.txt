@@ -1,0 +1,4369 @@
+═══════════════════════════════════════════════════════════════
+                    IMAGE FORENSICS REPORT                      
+═══════════════════════════════════════════════════════════════
+
+Image: evidences/copy_move.png
+Analysis Date: 2026-01-24 11:02:05
+
+───────────────────────────────────────────────────────────────
+                         VERDICT                               
+───────────────────────────────────────────────────────────────
+
+Tampering Probability: 67.0%
+Status: ⚠️  MANIPULATION DETECTED
+
+───────────────────────────────────────────────────────────────
+                    ANALYSIS DETAILS                           
+───────────────────────────────────────────────────────────────
+
+ERROR LEVEL ANALYSIS:
+  • Max Difference:      11.67
+  • Mean Difference:     17.40
+  • Suspicious Regions:  0
+
+COPY-MOVE DETECTION:
+  • Matches Found:       66
+  • Confidence:          100.0%
+
+NOISE ANALYSIS:
+  • Noise Level:         1.48
+  • Inconsistency:       69.0%
+
+JPEG ANALYSIS:
+  • Quality Estimate:    95
+  • Ghost Detected:      No
+  • Double Compression:  67.9%
+
+───────────────────────────────────────────────────────────────
+                  DETECTED MANIPULATIONS                       
+───────────────────────────────────────────────────────────────
+
+1. CopyMove
+   Region: (0, 88) - 16x16
+   Confidence: 100.0%
+   Copy-move detected: region copied from (0, 88) to (0, 168)
+   Evidence:
+     • Similarity: 100.0%
+
+2. CopyMove
+   Region: (0, 168) - 16x16
+   Confidence: 100.0%
+   Copy-move target region
+
+3. CopyMove
+   Region: (40, 176) - 16x16
+   Confidence: 100.0%
+   Copy-move detected: region copied from (40, 176) to (216, 280)
+   Evidence:
+     • Similarity: 100.0%
+
+4. CopyMove
+   Region: (216, 280) - 16x16
+   Confidence: 100.0%
+   Copy-move target region
+
+5. CopyMove
+   Region: (0, 64) - 16x16
+   Confidence: 100.0%
+   Copy-move detected: region copied from (0, 64) to (0, 128)
+   Evidence:
+     • Similarity: 100.0%
+
+6. CopyMove
+   Region: (0, 128) - 16x16
+   Confidence: 100.0%
+   Copy-move target region
+
+7. CopyMove
+   Region: (0, 112) - 16x16
+   Confidence: 100.0%
+   Copy-move detected: region copied from (0, 112) to (0, 184)
+   Evidence:
+     • Similarity: 100.0%
+
+8. CopyMove
+   Region: (0, 184) - 16x16
+   Confidence: 100.0%
+   Copy-move target region
+
+9. CopyMove
+   Region: (0, 48) - 16x16
+   Confidence: 100.0%
+   Copy-move detected: region copied from (0, 48) to (216, 264)
+   Evidence:
+     • Similarity: 100.0%
+
+10. CopyMove
+   Region: (216, 264) - 16x16
+   Confidence: 100.0%
+   Copy-move target region
+
+11. CopyMove
+   Region: (0, 264) - 16x16
+   Confidence: 100.0%
+   Copy-move detected: region copied from (0, 264) to (120, 304)
+   Evidence:
+     • Similarity: 100.0%
+
+12. CopyMove
+   Region: (120, 304) - 16x16
+   Confidence: 100.0%
+   Copy-move target region
+
+13. CopyMove
+   Region: (32, 40) - 16x16
+   Confidence: 100.0%
+   Copy-move detected: region copied from (32, 40) to (48, 264)
+   Evidence:
+     • Similarity: 100.0%
+
+14. CopyMove
+   Region: (48, 264) - 16x16
+   Confidence: 100.0%
+   Copy-move target region
+
+15. CopyMove
+   Region: (216, 144) - 16x16
+   Confidence: 100.0%
+   Copy-move detected: region copied from (216, 144) to (216, 304)
+   Evidence:
+     • Similarity: 100.0%
+
+16. CopyMove
+   Region: (216, 304) - 16x16
+   Confidence: 100.0%
+   Copy-move target region
+
+17. CopyMove
+   Region: (0, 208) - 16x16
+   Confidence: 100.0%
+   Copy-move detected: region copied from (0, 208) to (224, 224)
+   Evidence:
+     • Similarity: 100.0%
+
+18. CopyMove
+   Region: (224, 224) - 16x16
+   Confidence: 100.0%
+   Copy-move target region
+
+19. CopyMove
+   Region: (56, 80) - 16x16
+   Confidence: 100.0%
+   Copy-move detected: region copied from (56, 80) to (224, 192)
+   Evidence:
+     • Similarity: 100.0%
+
+20. CopyMove
+   Region: (224, 192) - 16x16
+   Confidence: 100.0%
+   Copy-move target region
+
+21. CopyMove
+   Region: (160, 120) - 16x16
+   Confidence: 100.0%
+   Copy-move detected: region copied from (160, 120) to (216, 240)
+   Evidence:
+     • Similarity: 100.0%
+
+22. CopyMove
+   Region: (216, 240) - 16x16
+   Confidence: 100.0%
+   Copy-move target region
+
+23. CopyMove
+   Region: (72, 112) - 16x16
+   Confidence: 100.0%
+   Copy-move detected: region copied from (72, 112) to (144, 160)
+   Evidence:
+     • Similarity: 100.0%
+
+24. CopyMove
+   Region: (144, 160) - 16x16
+   Confidence: 100.0%
+   Copy-move target region
+
+25. CopyMove
+   Region: (168, 104) - 16x16
+   Confidence: 100.0%
+   Copy-move detected: region copied from (168, 104) to (24, 216)
+   Evidence:
+     • Similarity: 100.0%
+
+26. CopyMove
+   Region: (24, 216) - 16x16
+   Confidence: 100.0%
+   Copy-move target region
+
+27. CopyMove
+   Region: (208, 112) - 16x16
+   Confidence: 100.0%
+   Copy-move detected: region copied from (208, 112) to (8, 280)
+   Evidence:
+     • Similarity: 100.0%
+
+28. CopyMove
+   Region: (8, 280) - 16x16
+   Confidence: 100.0%
+   Copy-move target region
+
+29. CopyMove
+   Region: (72, 88) - 16x16
+   Confidence: 100.0%
+   Copy-move detected: region copied from (72, 88) to (48, 152)
+   Evidence:
+     • Similarity: 100.0%
+
+30. CopyMove
+   Region: (48, 152) - 16x16
+   Confidence: 100.0%
+   Copy-move target region
+
+31. CopyMove
+   Region: (0, 16) - 16x16
+   Confidence: 100.0%
+   Copy-move detected: region copied from (0, 16) to (56, 136)
+   Evidence:
+     • Similarity: 100.0%
+
+32. CopyMove
+   Region: (56, 136) - 16x16
+   Confidence: 100.0%
+   Copy-move target region
+
+33. CopyMove
+   Region: (0, 144) - 16x16
+   Confidence: 100.0%
+   Copy-move detected: region copied from (0, 144) to (232, 248)
+   Evidence:
+     • Similarity: 100.0%
+
+34. CopyMove
+   Region: (232, 248) - 16x16
+   Confidence: 100.0%
+   Copy-move target region
+
+35. CopyMove
+   Region: (224, 168) - 16x16
+   Confidence: 100.0%
+   Copy-move detected: region copied from (224, 168) to (128, 272)
+   Evidence:
+     • Similarity: 100.0%
+
+36. CopyMove
+   Region: (128, 272) - 16x16
+   Confidence: 100.0%
+   Copy-move target region
+
+37. CopyMove
+   Region: (40, 192) - 16x16
+   Confidence: 100.0%
+   Copy-move detected: region copied from (40, 192) to (96, 264)
+   Evidence:
+     • Similarity: 100.0%
+
+38. CopyMove
+   Region: (96, 264) - 16x16
+   Confidence: 100.0%
+   Copy-move target region
+
+39. CopyMove
+   Region: (16, 24) - 16x16
+   Confidence: 100.0%
+   Copy-move detected: region copied from (16, 24) to (8, 240)
+   Evidence:
+     • Similarity: 100.0%
+
+40. CopyMove
+   Region: (8, 240) - 16x16
+   Confidence: 100.0%
+   Copy-move target region
+
+41. CopyMove
+   Region: (0, 224) - 16x16
+   Confidence: 100.0%
+   Copy-move detected: region copied from (0, 224) to (88, 280)
+   Evidence:
+     • Similarity: 100.0%
+
+42. CopyMove
+   Region: (88, 280) - 16x16
+   Confidence: 100.0%
+   Copy-move target region
+
+43. CopyMove
+   Region: (112, 200) - 16x16
+   Confidence: 100.0%
+   Copy-move detected: region copied from (112, 200) to (176, 240)
+   Evidence:
+     • Similarity: 100.0%
+
+44. CopyMove
+   Region: (176, 240) - 16x16
+   Confidence: 100.0%
+   Copy-move target region
+
+45. CopyMove
+   Region: (144, 176) - 16x16
+   Confidence: 100.0%
+   Copy-move detected: region copied from (144, 176) to (48, 288)
+   Evidence:
+     • Similarity: 100.0%
+
+46. CopyMove
+   Region: (48, 288) - 16x16
+   Confidence: 100.0%
+   Copy-move target region
+
+47. CopyMove
+   Region: (56, 64) - 16x16
+   Confidence: 100.0%
+   Copy-move detected: region copied from (56, 64) to (144, 104)
+   Evidence:
+     • Similarity: 100.0%
+
+48. CopyMove
+   Region: (144, 104) - 16x16
+   Confidence: 100.0%
+   Copy-move target region
+
+49. CopyMove
+   Region: (96, 160) - 16x16
+   Confidence: 100.0%
+   Copy-move detected: region copied from (96, 160) to (40, 216)
+   Evidence:
+     • Similarity: 100.0%
+
+50. CopyMove
+   Region: (40, 216) - 16x16
+   Confidence: 100.0%
+   Copy-move target region
+
+51. CopyMove
+   Region: (56, 224) - 16x16
+   Confidence: 100.0%
+   Copy-move detected: region copied from (56, 224) to (16, 264)
+   Evidence:
+     • Similarity: 100.0%
+
+52. CopyMove
+   Region: (16, 264) - 16x16
+   Confidence: 100.0%
+   Copy-move target region
+
+53. CopyMove
+   Region: (72, 224) - 16x16
+   Confidence: 100.0%
+   Copy-move detected: region copied from (72, 224) to (232, 288)
+   Evidence:
+     • Similarity: 100.0%
+
+54. CopyMove
+   Region: (232, 288) - 16x16
+   Confidence: 100.0%
+   Copy-move target region
+
+55. CopyMove
+   Region: (112, 80) - 16x16
+   Confidence: 100.0%
+   Copy-move detected: region copied from (112, 80) to (232, 144)
+   Evidence:
+     • Similarity: 100.0%
+
+56. CopyMove
+   Region: (232, 144) - 16x16
+   Confidence: 100.0%
+   Copy-move target region
+
+57. CopyMove
+   Region: (184, 144) - 16x16
+   Confidence: 100.0%
+   Copy-move detected: region copied from (184, 144) to (56, 168)
+   Evidence:
+     • Similarity: 100.0%
+
+58. CopyMove
+   Region: (56, 168) - 16x16
+   Confidence: 100.0%
+   Copy-move target region
+
+59. CopyMove
+   Region: (56, 248) - 16x16
+   Confidence: 100.0%
+   Copy-move detected: region copied from (56, 248) to (56, 304)
+   Evidence:
+     • Similarity: 100.0%
+
+60. CopyMove
+   Region: (56, 304) - 16x16
+   Confidence: 100.0%
+   Copy-move target region
+
+61. CopyMove
+   Region: (128, 168) - 16x16
+   Confidence: 100.0%
+   Copy-move detected: region copied from (128, 168) to (232, 208)
+   Evidence:
+     • Similarity: 100.0%
+
+62. CopyMove
+   Region: (232, 208) - 16x16
+   Confidence: 100.0%
+   Copy-move target region
+
+63. CopyMove
+   Region: (216, 128) - 16x16
+   Confidence: 100.0%
+   Copy-move detected: region copied from (216, 128) to (144, 200)
+   Evidence:
+     • Similarity: 100.0%
+
+64. CopyMove
+   Region: (144, 200) - 16x16
+   Confidence: 100.0%
+   Copy-move target region
+
+65. CopyMove
+   Region: (56, 184) - 16x16
+   Confidence: 100.0%
+   Copy-move detected: region copied from (56, 184) to (152, 216)
+   Evidence:
+     • Similarity: 100.0%
+
+66. CopyMove
+   Region: (152, 216) - 16x16
+   Confidence: 100.0%
+   Copy-move target region
+
+67. CopyMove
+   Region: (40, 24) - 16x16
+   Confidence: 100.0%
+   Copy-move detected: region copied from (40, 24) to (88, 88)
+   Evidence:
+     • Similarity: 100.0%
+
+68. CopyMove
+   Region: (88, 88) - 16x16
+   Confidence: 100.0%
+   Copy-move target region
+
+69. CopyMove
+   Region: (184, 80) - 16x16
+   Confidence: 100.0%
+   Copy-move detected: region copied from (184, 80) to (232, 304)
+   Evidence:
+     • Similarity: 100.0%
+
+70. CopyMove
+   Region: (232, 304) - 16x16
+   Confidence: 100.0%
+   Copy-move target region
+
+71. CopyMove
+   Region: (160, 152) - 16x16
+   Confidence: 100.0%
+   Copy-move detected: region copied from (160, 152) to (64, 264)
+   Evidence:
+     • Similarity: 100.0%
+
+72. CopyMove
+   Region: (64, 264) - 16x16
+   Confidence: 100.0%
+   Copy-move target region
+
+73. CopyMove
+   Region: (144, 88) - 16x16
+   Confidence: 100.0%
+   Copy-move detected: region copied from (144, 88) to (144, 248)
+   Evidence:
+     • Similarity: 100.0%
+
+74. CopyMove
+   Region: (144, 248) - 16x16
+   Confidence: 100.0%
+   Copy-move target region
+
+75. CopyMove
+   Region: (112, 168) - 16x16
+   Confidence: 100.0%
+   Copy-move detected: region copied from (112, 168) to (128, 288)
+   Evidence:
+     • Similarity: 100.0%
+
+76. CopyMove
+   Region: (128, 288) - 16x16
+   Confidence: 100.0%
+   Copy-move target region
+
+77. CopyMove
+   Region: (24, 8) - 16x16
+   Confidence: 100.0%
+   Copy-move detected: region copied from (24, 8) to (72, 72)
+   Evidence:
+     • Similarity: 100.0%
+
+78. CopyMove
+   Region: (72, 72) - 16x16
+   Confidence: 100.0%
+   Copy-move target region
+
+79. CopyMove
+   Region: (96, 200) - 16x16
+   Confidence: 100.0%
+   Copy-move detected: region copied from (96, 200) to (104, 304)
+   Evidence:
+     • Similarity: 100.0%
+
+80. CopyMove
+   Region: (104, 304) - 16x16
+   Confidence: 100.0%
+   Copy-move target region
+
+81. CopyMove
+   Region: (168, 88) - 16x16
+   Confidence: 100.0%
+   Copy-move detected: region copied from (168, 88) to (80, 184)
+   Evidence:
+     • Similarity: 100.0%
+
+82. CopyMove
+   Region: (80, 184) - 16x16
+   Confidence: 100.0%
+   Copy-move target region
+
+83. CopyMove
+   Region: (224, 96) - 16x16
+   Confidence: 100.0%
+   Copy-move detected: region copied from (224, 96) to (72, 304)
+   Evidence:
+     • Similarity: 100.0%
+
+84. CopyMove
+   Region: (72, 304) - 16x16
+   Confidence: 100.0%
+   Copy-move target region
+
+85. CopyMove
+   Region: (72, 128) - 16x16
+   Confidence: 100.0%
+   Copy-move detected: region copied from (72, 128) to (112, 288)
+   Evidence:
+     • Similarity: 100.0%
+
+86. CopyMove
+   Region: (112, 288) - 16x16
+   Confidence: 100.0%
+   Copy-move target region
+
+87. CopyMove
+   Region: (224, 112) - 16x16
+   Confidence: 100.0%
+   Copy-move detected: region copied from (224, 112) to (80, 240)
+   Evidence:
+     • Similarity: 100.0%
+
+88. CopyMove
+   Region: (80, 240) - 16x16
+   Confidence: 100.0%
+   Copy-move target region
+
+89. CopyMove
+   Region: (128, 200) - 16x16
+   Confidence: 100.0%
+   Copy-move detected: region copied from (128, 200) to (232, 272)
+   Evidence:
+     • Similarity: 100.0%
+
+90. CopyMove
+   Region: (232, 272) - 16x16
+   Confidence: 100.0%
+   Copy-move target region
+
+91. CopyMove
+   Region: (152, 232) - 16x16
+   Confidence: 100.0%
+   Copy-move detected: region copied from (152, 232) to (112, 272)
+   Evidence:
+     • Similarity: 100.0%
+
+92. CopyMove
+   Region: (112, 272) - 16x16
+   Confidence: 100.0%
+   Copy-move target region
+
+93. CopyMove
+   Region: (208, 48) - 16x16
+   Confidence: 100.0%
+   Copy-move detected: region copied from (208, 48) to (64, 208)
+   Evidence:
+     • Similarity: 100.0%
+
+94. CopyMove
+   Region: (64, 208) - 16x16
+   Confidence: 100.0%
+   Copy-move target region
+
+95. CopyMove
+   Region: (128, 136) - 16x16
+   Confidence: 100.0%
+   Copy-move detected: region copied from (128, 136) to (128, 240)
+   Evidence:
+     • Similarity: 100.0%
+
+96. CopyMove
+   Region: (128, 240) - 16x16
+   Confidence: 100.0%
+   Copy-move target region
+
+97. CopyMove
+   Region: (144, 128) - 16x16
+   Confidence: 100.0%
+   Copy-move detected: region copied from (144, 128) to (120, 184)
+   Evidence:
+     • Similarity: 100.0%
+
+98. CopyMove
+   Region: (120, 184) - 16x16
+   Confidence: 100.0%
+   Copy-move target region
+
+99. CopyMove
+   Region: (208, 72) - 16x16
+   Confidence: 100.0%
+   Copy-move detected: region copied from (208, 72) to (112, 256)
+   Evidence:
+     • Similarity: 100.0%
+
+100. CopyMove
+   Region: (112, 256) - 16x16
+   Confidence: 100.0%
+   Copy-move target region
+
+101. CopyMove
+   Region: (200, 88) - 16x16
+   Confidence: 100.0%
+   Copy-move detected: region copied from (200, 88) to (128, 96)
+   Evidence:
+     • Similarity: 100.0%
+
+102. CopyMove
+   Region: (128, 96) - 16x16
+   Confidence: 100.0%
+   Copy-move target region
+
+103. CopyMove
+   Region: (48, 40) - 16x16
+   Confidence: 100.0%
+   Copy-move detected: region copied from (48, 40) to (64, 288)
+   Evidence:
+     • Similarity: 100.0%
+
+104. CopyMove
+   Region: (64, 288) - 16x16
+   Confidence: 100.0%
+   Copy-move target region
+
+105. CopyMove
+   Region: (144, 144) - 16x16
+   Confidence: 100.0%
+   Copy-move detected: region copied from (144, 144) to (72, 168)
+   Evidence:
+     • Similarity: 100.0%
+
+106. CopyMove
+   Region: (72, 168) - 16x16
+   Confidence: 100.0%
+   Copy-move target region
+
+107. CopyMove
+   Region: (128, 120) - 16x16
+   Confidence: 99.9%
+   Copy-move detected: region copied from (128, 120) to (80, 144)
+   Evidence:
+     • Similarity: 99.9%
+
+108. CopyMove
+   Region: (80, 144) - 16x16
+   Confidence: 99.9%
+   Copy-move target region
+
+109. CopyMove
+   Region: (168, 136) - 16x16
+   Confidence: 99.9%
+   Copy-move detected: region copied from (168, 136) to (160, 248)
+   Evidence:
+     • Similarity: 99.9%
+
+110. CopyMove
+   Region: (160, 248) - 16x16
+   Confidence: 99.9%
+   Copy-move target region
+
+111. CopyMove
+   Region: (96, 104) - 16x16
+   Confidence: 99.9%
+   Copy-move detected: region copied from (96, 104) to (128, 152)
+   Evidence:
+     • Similarity: 99.9%
+
+112. CopyMove
+   Region: (128, 152) - 16x16
+   Confidence: 99.9%
+   Copy-move target region
+
+113. CopyMove
+   Region: (88, 128) - 16x16
+   Confidence: 99.9%
+   Copy-move detected: region copied from (88, 128) to (96, 248)
+   Evidence:
+     • Similarity: 99.9%
+
+114. CopyMove
+   Region: (96, 248) - 16x16
+   Confidence: 99.9%
+   Copy-move target region
+
+115. CopyMove
+   Region: (184, 64) - 16x16
+   Confidence: 99.9%
+   Copy-move detected: region copied from (184, 64) to (88, 216)
+   Evidence:
+     • Similarity: 99.9%
+
+116. CopyMove
+   Region: (88, 216) - 16x16
+   Confidence: 99.9%
+   Copy-move target region
+
+117. CopyMove
+   Region: (128, 80) - 16x16
+   Confidence: 99.9%
+   Copy-move detected: region copied from (128, 80) to (64, 152)
+   Evidence:
+     • Similarity: 99.9%
+
+118. CopyMove
+   Region: (64, 152) - 16x16
+   Confidence: 99.9%
+   Copy-move target region
+
+119. CopyMove
+   Region: (104, 144) - 16x16
+   Confidence: 99.9%
+   Copy-move detected: region copied from (104, 144) to (120, 216)
+   Evidence:
+     • Similarity: 99.9%
+
+120. CopyMove
+   Region: (120, 216) - 16x16
+   Confidence: 99.9%
+   Copy-move target region
+
+121. CopyMove
+   Region: (80, 200) - 16x16
+   Confidence: 99.9%
+   Copy-move detected: region copied from (80, 200) to (128, 256)
+   Evidence:
+     • Similarity: 99.9%
+
+122. CopyMove
+   Region: (128, 256) - 16x16
+   Confidence: 99.9%
+   Copy-move target region
+
+123. CopyMove
+   Region: (8, 0) - 16x16
+   Confidence: 99.9%
+   Copy-move detected: region copied from (8, 0) to (104, 128)
+   Evidence:
+     • Similarity: 99.9%
+
+124. CopyMove
+   Region: (104, 128) - 16x16
+   Confidence: 99.9%
+   Copy-move target region
+
+125. CopyMove
+   Region: (120, 64) - 16x16
+   Confidence: 99.8%
+   Copy-move detected: region copied from (120, 64) to (112, 232)
+   Evidence:
+     • Similarity: 99.8%
+
+126. CopyMove
+   Region: (112, 232) - 16x16
+   Confidence: 99.8%
+   Copy-move target region
+
+127. CopyMove
+   Region: (112, 112) - 16x16
+   Confidence: 99.8%
+   Copy-move detected: region copied from (112, 112) to (136, 216)
+   Evidence:
+     • Similarity: 99.8%
+
+128. CopyMove
+   Region: (136, 216) - 16x16
+   Confidence: 99.8%
+   Copy-move target region
+
+129. CopyMove
+   Region: (104, 216) - 16x16
+   Confidence: 99.7%
+   Copy-move detected: region copied from (104, 216) to (88, 296)
+   Evidence:
+     • Similarity: 99.7%
+
+130. CopyMove
+   Region: (88, 296) - 16x16
+   Confidence: 99.7%
+   Copy-move target region
+
+131. CopyMove
+   Region: (104, 184) - 16x16
+   Confidence: 98.7%
+   Copy-move detected: region copied from (104, 184) to (80, 256)
+   Evidence:
+     • Similarity: 98.7%
+
+132. CopyMove
+   Region: (80, 256) - 16x16
+   Confidence: 98.7%
+   Copy-move target region
+
+133. Splicing
+   Region: (0, 160) - 16x16
+   Confidence: 325.0%
+   Potential spliced region at (0, 160) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+134. Splicing
+   Region: (0, 176) - 16x16
+   Confidence: 325.0%
+   Potential spliced region at (0, 176) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+135. Splicing
+   Region: (0, 144) - 16x16
+   Confidence: 300.0%
+   Potential spliced region at (0, 144) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+136. Splicing
+   Region: (48, 176) - 16x16
+   Confidence: 300.0%
+   Potential spliced region at (48, 176) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+137. Splicing
+   Region: (0, 192) - 16x16
+   Confidence: 300.0%
+   Potential spliced region at (0, 192) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+138. Splicing
+   Region: (48, 192) - 16x16
+   Confidence: 300.0%
+   Potential spliced region at (48, 192) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+139. Splicing
+   Region: (64, 192) - 16x16
+   Confidence: 300.0%
+   Potential spliced region at (64, 192) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+140. Splicing
+   Region: (192, 192) - 16x16
+   Confidence: 300.0%
+   Potential spliced region at (192, 192) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+141. Splicing
+   Region: (0, 128) - 16x16
+   Confidence: 275.0%
+   Potential spliced region at (0, 128) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+142. Splicing
+   Region: (48, 160) - 16x16
+   Confidence: 275.0%
+   Potential spliced region at (48, 160) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+143. Splicing
+   Region: (64, 176) - 16x16
+   Confidence: 275.0%
+   Potential spliced region at (64, 176) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+144. Splicing
+   Region: (192, 176) - 16x16
+   Confidence: 275.0%
+   Potential spliced region at (192, 176) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+145. Splicing
+   Region: (208, 176) - 16x16
+   Confidence: 275.0%
+   Potential spliced region at (208, 176) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+146. Splicing
+   Region: (80, 192) - 16x16
+   Confidence: 275.0%
+   Potential spliced region at (80, 192) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+147. Splicing
+   Region: (112, 192) - 16x16
+   Confidence: 275.0%
+   Potential spliced region at (112, 192) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+148. Splicing
+   Region: (128, 192) - 16x16
+   Confidence: 275.0%
+   Potential spliced region at (128, 192) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+149. Splicing
+   Region: (176, 192) - 16x16
+   Confidence: 275.0%
+   Potential spliced region at (176, 192) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+150. Splicing
+   Region: (208, 192) - 16x16
+   Confidence: 275.0%
+   Potential spliced region at (208, 192) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+151. Splicing
+   Region: (0, 208) - 16x16
+   Confidence: 275.0%
+   Potential spliced region at (0, 208) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+152. Splicing
+   Region: (48, 208) - 16x16
+   Confidence: 275.0%
+   Potential spliced region at (48, 208) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+153. Splicing
+   Region: (64, 208) - 16x16
+   Confidence: 275.0%
+   Potential spliced region at (64, 208) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+154. Splicing
+   Region: (80, 208) - 16x16
+   Confidence: 275.0%
+   Potential spliced region at (80, 208) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+155. Splicing
+   Region: (96, 208) - 16x16
+   Confidence: 275.0%
+   Potential spliced region at (96, 208) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+156. Splicing
+   Region: (112, 208) - 16x16
+   Confidence: 275.0%
+   Potential spliced region at (112, 208) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+157. Splicing
+   Region: (128, 208) - 16x16
+   Confidence: 275.0%
+   Potential spliced region at (128, 208) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+158. Splicing
+   Region: (144, 208) - 16x16
+   Confidence: 275.0%
+   Potential spliced region at (144, 208) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+159. Splicing
+   Region: (160, 208) - 16x16
+   Confidence: 275.0%
+   Potential spliced region at (160, 208) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+160. Splicing
+   Region: (176, 208) - 16x16
+   Confidence: 275.0%
+   Potential spliced region at (176, 208) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+161. Splicing
+   Region: (192, 208) - 16x16
+   Confidence: 275.0%
+   Potential spliced region at (192, 208) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+162. Splicing
+   Region: (0, 112) - 16x16
+   Confidence: 250.0%
+   Potential spliced region at (0, 112) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+163. Splicing
+   Region: (48, 144) - 16x16
+   Confidence: 250.0%
+   Potential spliced region at (48, 144) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+164. Splicing
+   Region: (64, 160) - 16x16
+   Confidence: 250.0%
+   Potential spliced region at (64, 160) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+165. Splicing
+   Region: (192, 160) - 16x16
+   Confidence: 250.0%
+   Potential spliced region at (192, 160) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+166. Splicing
+   Region: (208, 160) - 16x16
+   Confidence: 250.0%
+   Potential spliced region at (208, 160) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+167. Splicing
+   Region: (80, 176) - 16x16
+   Confidence: 250.0%
+   Potential spliced region at (80, 176) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+168. Splicing
+   Region: (112, 176) - 16x16
+   Confidence: 250.0%
+   Potential spliced region at (112, 176) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+169. Splicing
+   Region: (128, 176) - 16x16
+   Confidence: 250.0%
+   Potential spliced region at (128, 176) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+170. Splicing
+   Region: (176, 176) - 16x16
+   Confidence: 250.0%
+   Potential spliced region at (176, 176) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+171. Splicing
+   Region: (96, 192) - 16x16
+   Confidence: 250.0%
+   Potential spliced region at (96, 192) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+172. Splicing
+   Region: (144, 192) - 16x16
+   Confidence: 250.0%
+   Potential spliced region at (144, 192) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+173. Splicing
+   Region: (160, 192) - 16x16
+   Confidence: 250.0%
+   Potential spliced region at (160, 192) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+174. Splicing
+   Region: (208, 208) - 16x16
+   Confidence: 250.0%
+   Potential spliced region at (208, 208) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+175. Splicing
+   Region: (224, 208) - 16x16
+   Confidence: 250.0%
+   Potential spliced region at (224, 208) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+176. Splicing
+   Region: (0, 224) - 16x16
+   Confidence: 250.0%
+   Potential spliced region at (0, 224) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+177. Splicing
+   Region: (48, 224) - 16x16
+   Confidence: 250.0%
+   Potential spliced region at (48, 224) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+178. Splicing
+   Region: (64, 224) - 16x16
+   Confidence: 250.0%
+   Potential spliced region at (64, 224) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+179. Splicing
+   Region: (80, 224) - 16x16
+   Confidence: 250.0%
+   Potential spliced region at (80, 224) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+180. Splicing
+   Region: (96, 224) - 16x16
+   Confidence: 250.0%
+   Potential spliced region at (96, 224) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+181. Splicing
+   Region: (112, 224) - 16x16
+   Confidence: 250.0%
+   Potential spliced region at (112, 224) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+182. Splicing
+   Region: (128, 224) - 16x16
+   Confidence: 250.0%
+   Potential spliced region at (128, 224) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+183. Splicing
+   Region: (144, 224) - 16x16
+   Confidence: 250.0%
+   Potential spliced region at (144, 224) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+184. Splicing
+   Region: (160, 224) - 16x16
+   Confidence: 250.0%
+   Potential spliced region at (160, 224) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+185. Splicing
+   Region: (176, 224) - 16x16
+   Confidence: 250.0%
+   Potential spliced region at (176, 224) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+186. Splicing
+   Region: (192, 224) - 16x16
+   Confidence: 250.0%
+   Potential spliced region at (192, 224) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+187. Splicing
+   Region: (224, 224) - 16x16
+   Confidence: 250.0%
+   Potential spliced region at (224, 224) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+188. Splicing
+   Region: (0, 96) - 16x16
+   Confidence: 225.0%
+   Potential spliced region at (0, 96) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+189. Splicing
+   Region: (48, 128) - 16x16
+   Confidence: 225.0%
+   Potential spliced region at (48, 128) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+190. Splicing
+   Region: (64, 144) - 16x16
+   Confidence: 225.0%
+   Potential spliced region at (64, 144) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+191. Splicing
+   Region: (192, 144) - 16x16
+   Confidence: 225.0%
+   Potential spliced region at (192, 144) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+192. Splicing
+   Region: (208, 144) - 16x16
+   Confidence: 225.0%
+   Potential spliced region at (208, 144) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+193. Splicing
+   Region: (80, 160) - 16x16
+   Confidence: 225.0%
+   Potential spliced region at (80, 160) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+194. Splicing
+   Region: (112, 160) - 16x16
+   Confidence: 225.0%
+   Potential spliced region at (112, 160) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+195. Splicing
+   Region: (128, 160) - 16x16
+   Confidence: 225.0%
+   Potential spliced region at (128, 160) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+196. Splicing
+   Region: (176, 160) - 16x16
+   Confidence: 225.0%
+   Potential spliced region at (176, 160) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+197. Splicing
+   Region: (96, 176) - 16x16
+   Confidence: 225.0%
+   Potential spliced region at (96, 176) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+198. Splicing
+   Region: (144, 176) - 16x16
+   Confidence: 225.0%
+   Potential spliced region at (144, 176) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+199. Splicing
+   Region: (160, 176) - 16x16
+   Confidence: 225.0%
+   Potential spliced region at (160, 176) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+200. Splicing
+   Region: (224, 192) - 16x16
+   Confidence: 225.0%
+   Potential spliced region at (224, 192) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+201. Splicing
+   Region: (208, 224) - 16x16
+   Confidence: 225.0%
+   Potential spliced region at (208, 224) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+202. Splicing
+   Region: (0, 240) - 16x16
+   Confidence: 225.0%
+   Potential spliced region at (0, 240) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+203. Splicing
+   Region: (48, 240) - 16x16
+   Confidence: 225.0%
+   Potential spliced region at (48, 240) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+204. Splicing
+   Region: (64, 240) - 16x16
+   Confidence: 225.0%
+   Potential spliced region at (64, 240) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+205. Splicing
+   Region: (80, 240) - 16x16
+   Confidence: 225.0%
+   Potential spliced region at (80, 240) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+206. Splicing
+   Region: (96, 240) - 16x16
+   Confidence: 225.0%
+   Potential spliced region at (96, 240) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+207. Splicing
+   Region: (112, 240) - 16x16
+   Confidence: 225.0%
+   Potential spliced region at (112, 240) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+208. Splicing
+   Region: (128, 240) - 16x16
+   Confidence: 225.0%
+   Potential spliced region at (128, 240) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+209. Splicing
+   Region: (144, 240) - 16x16
+   Confidence: 225.0%
+   Potential spliced region at (144, 240) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+210. Splicing
+   Region: (160, 240) - 16x16
+   Confidence: 225.0%
+   Potential spliced region at (160, 240) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+211. Splicing
+   Region: (176, 240) - 16x16
+   Confidence: 225.0%
+   Potential spliced region at (176, 240) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+212. Splicing
+   Region: (192, 240) - 16x16
+   Confidence: 225.0%
+   Potential spliced region at (192, 240) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+213. Splicing
+   Region: (224, 240) - 16x16
+   Confidence: 225.0%
+   Potential spliced region at (224, 240) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+214. Splicing
+   Region: (240, 240) - 16x16
+   Confidence: 225.0%
+   Potential spliced region at (240, 240) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+215. Splicing
+   Region: (0, 80) - 16x16
+   Confidence: 200.0%
+   Potential spliced region at (0, 80) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+216. Splicing
+   Region: (48, 112) - 16x16
+   Confidence: 200.0%
+   Potential spliced region at (48, 112) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+217. Splicing
+   Region: (64, 128) - 16x16
+   Confidence: 200.0%
+   Potential spliced region at (64, 128) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+218. Splicing
+   Region: (192, 128) - 16x16
+   Confidence: 200.0%
+   Potential spliced region at (192, 128) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+219. Splicing
+   Region: (208, 128) - 16x16
+   Confidence: 200.0%
+   Potential spliced region at (208, 128) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+220. Splicing
+   Region: (80, 144) - 16x16
+   Confidence: 200.0%
+   Potential spliced region at (80, 144) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+221. Splicing
+   Region: (112, 144) - 16x16
+   Confidence: 200.0%
+   Potential spliced region at (112, 144) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+222. Splicing
+   Region: (128, 144) - 16x16
+   Confidence: 200.0%
+   Potential spliced region at (128, 144) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+223. Splicing
+   Region: (176, 144) - 16x16
+   Confidence: 200.0%
+   Potential spliced region at (176, 144) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+224. Splicing
+   Region: (96, 160) - 16x16
+   Confidence: 200.0%
+   Potential spliced region at (96, 160) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+225. Splicing
+   Region: (144, 160) - 16x16
+   Confidence: 200.0%
+   Potential spliced region at (144, 160) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+226. Splicing
+   Region: (160, 160) - 16x16
+   Confidence: 200.0%
+   Potential spliced region at (160, 160) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+227. Splicing
+   Region: (32, 176) - 16x16
+   Confidence: 200.0%
+   Potential spliced region at (32, 176) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+228. Splicing
+   Region: (224, 176) - 16x16
+   Confidence: 200.0%
+   Potential spliced region at (224, 176) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+229. Splicing
+   Region: (240, 224) - 16x16
+   Confidence: 200.0%
+   Potential spliced region at (240, 224) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+230. Splicing
+   Region: (32, 240) - 16x16
+   Confidence: 200.0%
+   Potential spliced region at (32, 240) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+231. Splicing
+   Region: (208, 240) - 16x16
+   Confidence: 200.0%
+   Potential spliced region at (208, 240) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+232. Splicing
+   Region: (0, 256) - 16x16
+   Confidence: 200.0%
+   Potential spliced region at (0, 256) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+233. Splicing
+   Region: (48, 256) - 16x16
+   Confidence: 200.0%
+   Potential spliced region at (48, 256) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+234. Splicing
+   Region: (64, 256) - 16x16
+   Confidence: 200.0%
+   Potential spliced region at (64, 256) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+235. Splicing
+   Region: (80, 256) - 16x16
+   Confidence: 200.0%
+   Potential spliced region at (80, 256) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+236. Splicing
+   Region: (96, 256) - 16x16
+   Confidence: 200.0%
+   Potential spliced region at (96, 256) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+237. Splicing
+   Region: (112, 256) - 16x16
+   Confidence: 200.0%
+   Potential spliced region at (112, 256) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+238. Splicing
+   Region: (128, 256) - 16x16
+   Confidence: 200.0%
+   Potential spliced region at (128, 256) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+239. Splicing
+   Region: (144, 256) - 16x16
+   Confidence: 200.0%
+   Potential spliced region at (144, 256) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+240. Splicing
+   Region: (160, 256) - 16x16
+   Confidence: 200.0%
+   Potential spliced region at (160, 256) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+241. Splicing
+   Region: (176, 256) - 16x16
+   Confidence: 200.0%
+   Potential spliced region at (176, 256) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+242. Splicing
+   Region: (192, 256) - 16x16
+   Confidence: 200.0%
+   Potential spliced region at (192, 256) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+243. Splicing
+   Region: (224, 256) - 16x16
+   Confidence: 200.0%
+   Potential spliced region at (224, 256) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+244. Splicing
+   Region: (240, 256) - 16x16
+   Confidence: 200.0%
+   Potential spliced region at (240, 256) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+245. Splicing
+   Region: (0, 64) - 16x16
+   Confidence: 175.0%
+   Potential spliced region at (0, 64) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+246. Splicing
+   Region: (48, 96) - 16x16
+   Confidence: 175.0%
+   Potential spliced region at (48, 96) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+247. Splicing
+   Region: (64, 112) - 16x16
+   Confidence: 175.0%
+   Potential spliced region at (64, 112) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+248. Splicing
+   Region: (192, 112) - 16x16
+   Confidence: 175.0%
+   Potential spliced region at (192, 112) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+249. Splicing
+   Region: (208, 112) - 16x16
+   Confidence: 175.0%
+   Potential spliced region at (208, 112) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+250. Splicing
+   Region: (80, 128) - 16x16
+   Confidence: 175.0%
+   Potential spliced region at (80, 128) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+251. Splicing
+   Region: (112, 128) - 16x16
+   Confidence: 175.0%
+   Potential spliced region at (112, 128) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+252. Splicing
+   Region: (128, 128) - 16x16
+   Confidence: 175.0%
+   Potential spliced region at (128, 128) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+253. Splicing
+   Region: (176, 128) - 16x16
+   Confidence: 175.0%
+   Potential spliced region at (176, 128) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+254. Splicing
+   Region: (96, 144) - 16x16
+   Confidence: 175.0%
+   Potential spliced region at (96, 144) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+255. Splicing
+   Region: (144, 144) - 16x16
+   Confidence: 175.0%
+   Potential spliced region at (144, 144) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+256. Splicing
+   Region: (160, 144) - 16x16
+   Confidence: 175.0%
+   Potential spliced region at (160, 144) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+257. Splicing
+   Region: (32, 160) - 16x16
+   Confidence: 175.0%
+   Potential spliced region at (32, 160) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+258. Splicing
+   Region: (224, 160) - 16x16
+   Confidence: 175.0%
+   Potential spliced region at (224, 160) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+259. Splicing
+   Region: (32, 192) - 16x16
+   Confidence: 175.0%
+   Potential spliced region at (32, 192) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+260. Splicing
+   Region: (240, 208) - 16x16
+   Confidence: 175.0%
+   Potential spliced region at (240, 208) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+261. Splicing
+   Region: (32, 224) - 16x16
+   Confidence: 175.0%
+   Potential spliced region at (32, 224) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+262. Splicing
+   Region: (32, 256) - 16x16
+   Confidence: 175.0%
+   Potential spliced region at (32, 256) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+263. Splicing
+   Region: (208, 256) - 16x16
+   Confidence: 175.0%
+   Potential spliced region at (208, 256) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+264. Splicing
+   Region: (0, 272) - 16x16
+   Confidence: 175.0%
+   Potential spliced region at (0, 272) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+265. Splicing
+   Region: (48, 272) - 16x16
+   Confidence: 175.0%
+   Potential spliced region at (48, 272) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+266. Splicing
+   Region: (64, 272) - 16x16
+   Confidence: 175.0%
+   Potential spliced region at (64, 272) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+267. Splicing
+   Region: (80, 272) - 16x16
+   Confidence: 175.0%
+   Potential spliced region at (80, 272) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+268. Splicing
+   Region: (96, 272) - 16x16
+   Confidence: 175.0%
+   Potential spliced region at (96, 272) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+269. Splicing
+   Region: (112, 272) - 16x16
+   Confidence: 175.0%
+   Potential spliced region at (112, 272) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+270. Splicing
+   Region: (128, 272) - 16x16
+   Confidence: 175.0%
+   Potential spliced region at (128, 272) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+271. Splicing
+   Region: (144, 272) - 16x16
+   Confidence: 175.0%
+   Potential spliced region at (144, 272) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+272. Splicing
+   Region: (160, 272) - 16x16
+   Confidence: 175.0%
+   Potential spliced region at (160, 272) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+273. Splicing
+   Region: (176, 272) - 16x16
+   Confidence: 175.0%
+   Potential spliced region at (176, 272) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+274. Splicing
+   Region: (192, 272) - 16x16
+   Confidence: 175.0%
+   Potential spliced region at (192, 272) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+275. Splicing
+   Region: (208, 272) - 16x16
+   Confidence: 175.0%
+   Potential spliced region at (208, 272) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+276. Splicing
+   Region: (224, 272) - 16x16
+   Confidence: 175.0%
+   Potential spliced region at (224, 272) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+277. Splicing
+   Region: (240, 272) - 16x16
+   Confidence: 175.0%
+   Potential spliced region at (240, 272) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+278. Splicing
+   Region: (0, 48) - 16x16
+   Confidence: 150.0%
+   Potential spliced region at (0, 48) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+279. Splicing
+   Region: (16, 48) - 16x16
+   Confidence: 150.0%
+   Potential spliced region at (16, 48) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+280. Splicing
+   Region: (16, 64) - 16x16
+   Confidence: 150.0%
+   Potential spliced region at (16, 64) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+281. Splicing
+   Region: (32, 64) - 16x16
+   Confidence: 150.0%
+   Potential spliced region at (32, 64) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+282. Splicing
+   Region: (16, 80) - 16x16
+   Confidence: 150.0%
+   Potential spliced region at (16, 80) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+283. Splicing
+   Region: (32, 80) - 16x16
+   Confidence: 150.0%
+   Potential spliced region at (32, 80) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+284. Splicing
+   Region: (48, 80) - 16x16
+   Confidence: 150.0%
+   Potential spliced region at (48, 80) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+285. Splicing
+   Region: (16, 96) - 16x16
+   Confidence: 150.0%
+   Potential spliced region at (16, 96) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+286. Splicing
+   Region: (32, 96) - 16x16
+   Confidence: 150.0%
+   Potential spliced region at (32, 96) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+287. Splicing
+   Region: (64, 96) - 16x16
+   Confidence: 150.0%
+   Potential spliced region at (64, 96) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+288. Splicing
+   Region: (192, 96) - 16x16
+   Confidence: 150.0%
+   Potential spliced region at (192, 96) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+289. Splicing
+   Region: (208, 96) - 16x16
+   Confidence: 150.0%
+   Potential spliced region at (208, 96) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+290. Splicing
+   Region: (16, 112) - 16x16
+   Confidence: 150.0%
+   Potential spliced region at (16, 112) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+291. Splicing
+   Region: (32, 112) - 16x16
+   Confidence: 150.0%
+   Potential spliced region at (32, 112) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+292. Splicing
+   Region: (80, 112) - 16x16
+   Confidence: 150.0%
+   Potential spliced region at (80, 112) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+293. Splicing
+   Region: (112, 112) - 16x16
+   Confidence: 150.0%
+   Potential spliced region at (112, 112) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+294. Splicing
+   Region: (128, 112) - 16x16
+   Confidence: 150.0%
+   Potential spliced region at (128, 112) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+295. Splicing
+   Region: (176, 112) - 16x16
+   Confidence: 150.0%
+   Potential spliced region at (176, 112) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+296. Splicing
+   Region: (16, 128) - 16x16
+   Confidence: 150.0%
+   Potential spliced region at (16, 128) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+297. Splicing
+   Region: (32, 128) - 16x16
+   Confidence: 150.0%
+   Potential spliced region at (32, 128) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+298. Splicing
+   Region: (96, 128) - 16x16
+   Confidence: 150.0%
+   Potential spliced region at (96, 128) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+299. Splicing
+   Region: (144, 128) - 16x16
+   Confidence: 150.0%
+   Potential spliced region at (144, 128) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+300. Splicing
+   Region: (160, 128) - 16x16
+   Confidence: 150.0%
+   Potential spliced region at (160, 128) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+301. Splicing
+   Region: (16, 144) - 16x16
+   Confidence: 150.0%
+   Potential spliced region at (16, 144) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+302. Splicing
+   Region: (32, 144) - 16x16
+   Confidence: 150.0%
+   Potential spliced region at (32, 144) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+303. Splicing
+   Region: (224, 144) - 16x16
+   Confidence: 150.0%
+   Potential spliced region at (224, 144) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+304. Splicing
+   Region: (16, 160) - 16x16
+   Confidence: 150.0%
+   Potential spliced region at (16, 160) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+305. Splicing
+   Region: (240, 192) - 16x16
+   Confidence: 150.0%
+   Potential spliced region at (240, 192) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+306. Splicing
+   Region: (32, 208) - 16x16
+   Confidence: 150.0%
+   Potential spliced region at (32, 208) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+307. Splicing
+   Region: (16, 272) - 16x16
+   Confidence: 150.0%
+   Potential spliced region at (16, 272) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+308. Splicing
+   Region: (0, 288) - 16x16
+   Confidence: 150.0%
+   Potential spliced region at (0, 288) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+309. Splicing
+   Region: (16, 288) - 16x16
+   Confidence: 150.0%
+   Potential spliced region at (16, 288) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+310. Splicing
+   Region: (48, 288) - 16x16
+   Confidence: 150.0%
+   Potential spliced region at (48, 288) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+311. Splicing
+   Region: (64, 288) - 16x16
+   Confidence: 150.0%
+   Potential spliced region at (64, 288) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+312. Splicing
+   Region: (80, 288) - 16x16
+   Confidence: 150.0%
+   Potential spliced region at (80, 288) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+313. Splicing
+   Region: (96, 288) - 16x16
+   Confidence: 150.0%
+   Potential spliced region at (96, 288) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+314. Splicing
+   Region: (112, 288) - 16x16
+   Confidence: 150.0%
+   Potential spliced region at (112, 288) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+315. Splicing
+   Region: (128, 288) - 16x16
+   Confidence: 150.0%
+   Potential spliced region at (128, 288) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+316. Splicing
+   Region: (144, 288) - 16x16
+   Confidence: 150.0%
+   Potential spliced region at (144, 288) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+317. Splicing
+   Region: (160, 288) - 16x16
+   Confidence: 150.0%
+   Potential spliced region at (160, 288) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+318. Splicing
+   Region: (176, 288) - 16x16
+   Confidence: 150.0%
+   Potential spliced region at (176, 288) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+319. Splicing
+   Region: (192, 288) - 16x16
+   Confidence: 150.0%
+   Potential spliced region at (192, 288) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+320. Splicing
+   Region: (208, 288) - 16x16
+   Confidence: 150.0%
+   Potential spliced region at (208, 288) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+321. Splicing
+   Region: (224, 288) - 16x16
+   Confidence: 150.0%
+   Potential spliced region at (224, 288) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+322. Splicing
+   Region: (240, 288) - 16x16
+   Confidence: 150.0%
+   Potential spliced region at (240, 288) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+323. Splicing
+   Region: (0, 32) - 16x16
+   Confidence: 125.0%
+   Potential spliced region at (0, 32) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+324. Splicing
+   Region: (16, 32) - 16x16
+   Confidence: 125.0%
+   Potential spliced region at (16, 32) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+325. Splicing
+   Region: (32, 48) - 16x16
+   Confidence: 125.0%
+   Potential spliced region at (32, 48) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+326. Splicing
+   Region: (48, 64) - 16x16
+   Confidence: 125.0%
+   Potential spliced region at (48, 64) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+327. Splicing
+   Region: (64, 80) - 16x16
+   Confidence: 125.0%
+   Potential spliced region at (64, 80) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+328. Splicing
+   Region: (192, 80) - 16x16
+   Confidence: 125.0%
+   Potential spliced region at (192, 80) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+329. Splicing
+   Region: (208, 80) - 16x16
+   Confidence: 125.0%
+   Potential spliced region at (208, 80) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+330. Splicing
+   Region: (80, 96) - 16x16
+   Confidence: 125.0%
+   Potential spliced region at (80, 96) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+331. Splicing
+   Region: (112, 96) - 16x16
+   Confidence: 125.0%
+   Potential spliced region at (112, 96) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+332. Splicing
+   Region: (128, 96) - 16x16
+   Confidence: 125.0%
+   Potential spliced region at (128, 96) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+333. Splicing
+   Region: (176, 96) - 16x16
+   Confidence: 125.0%
+   Potential spliced region at (176, 96) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+334. Splicing
+   Region: (96, 112) - 16x16
+   Confidence: 125.0%
+   Potential spliced region at (96, 112) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+335. Splicing
+   Region: (144, 112) - 16x16
+   Confidence: 125.0%
+   Potential spliced region at (144, 112) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+336. Splicing
+   Region: (160, 112) - 16x16
+   Confidence: 125.0%
+   Potential spliced region at (160, 112) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+337. Splicing
+   Region: (224, 128) - 16x16
+   Confidence: 125.0%
+   Potential spliced region at (224, 128) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+338. Splicing
+   Region: (16, 176) - 16x16
+   Confidence: 125.0%
+   Potential spliced region at (16, 176) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+339. Splicing
+   Region: (240, 176) - 16x16
+   Confidence: 125.0%
+   Potential spliced region at (240, 176) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+340. Splicing
+   Region: (16, 256) - 16x16
+   Confidence: 125.0%
+   Potential spliced region at (16, 256) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+341. Splicing
+   Region: (32, 272) - 16x16
+   Confidence: 125.0%
+   Potential spliced region at (32, 272) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+342. Splicing
+   Region: (0, 304) - 16x16
+   Confidence: 125.0%
+   Potential spliced region at (0, 304) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+343. Splicing
+   Region: (16, 304) - 16x16
+   Confidence: 125.0%
+   Potential spliced region at (16, 304) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+344. Splicing
+   Region: (48, 304) - 16x16
+   Confidence: 125.0%
+   Potential spliced region at (48, 304) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+345. Splicing
+   Region: (64, 304) - 16x16
+   Confidence: 125.0%
+   Potential spliced region at (64, 304) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+346. Splicing
+   Region: (80, 304) - 16x16
+   Confidence: 125.0%
+   Potential spliced region at (80, 304) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+347. Splicing
+   Region: (96, 304) - 16x16
+   Confidence: 125.0%
+   Potential spliced region at (96, 304) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+348. Splicing
+   Region: (112, 304) - 16x16
+   Confidence: 125.0%
+   Potential spliced region at (112, 304) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+349. Splicing
+   Region: (128, 304) - 16x16
+   Confidence: 125.0%
+   Potential spliced region at (128, 304) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+350. Splicing
+   Region: (144, 304) - 16x16
+   Confidence: 125.0%
+   Potential spliced region at (144, 304) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+351. Splicing
+   Region: (160, 304) - 16x16
+   Confidence: 125.0%
+   Potential spliced region at (160, 304) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+352. Splicing
+   Region: (176, 304) - 16x16
+   Confidence: 125.0%
+   Potential spliced region at (176, 304) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+353. Splicing
+   Region: (192, 304) - 16x16
+   Confidence: 125.0%
+   Potential spliced region at (192, 304) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+354. Splicing
+   Region: (208, 304) - 16x16
+   Confidence: 125.0%
+   Potential spliced region at (208, 304) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+355. Splicing
+   Region: (224, 304) - 16x16
+   Confidence: 125.0%
+   Potential spliced region at (224, 304) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+356. Splicing
+   Region: (240, 304) - 16x16
+   Confidence: 125.0%
+   Potential spliced region at (240, 304) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+357. Splicing
+   Region: (0, 16) - 16x16
+   Confidence: 100.0%
+   Potential spliced region at (0, 16) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+358. Splicing
+   Region: (16, 16) - 16x16
+   Confidence: 100.0%
+   Potential spliced region at (16, 16) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+359. Splicing
+   Region: (32, 32) - 16x16
+   Confidence: 100.0%
+   Potential spliced region at (32, 32) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+360. Splicing
+   Region: (48, 48) - 16x16
+   Confidence: 100.0%
+   Potential spliced region at (48, 48) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+361. Splicing
+   Region: (64, 64) - 16x16
+   Confidence: 100.0%
+   Potential spliced region at (64, 64) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+362. Splicing
+   Region: (192, 64) - 16x16
+   Confidence: 100.0%
+   Potential spliced region at (192, 64) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+363. Splicing
+   Region: (208, 64) - 16x16
+   Confidence: 100.0%
+   Potential spliced region at (208, 64) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+364. Splicing
+   Region: (80, 80) - 16x16
+   Confidence: 100.0%
+   Potential spliced region at (80, 80) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+365. Splicing
+   Region: (112, 80) - 16x16
+   Confidence: 100.0%
+   Potential spliced region at (112, 80) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+366. Splicing
+   Region: (128, 80) - 16x16
+   Confidence: 100.0%
+   Potential spliced region at (128, 80) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+367. Splicing
+   Region: (176, 80) - 16x16
+   Confidence: 100.0%
+   Potential spliced region at (176, 80) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+368. Splicing
+   Region: (96, 96) - 16x16
+   Confidence: 100.0%
+   Potential spliced region at (96, 96) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+369. Splicing
+   Region: (144, 96) - 16x16
+   Confidence: 100.0%
+   Potential spliced region at (144, 96) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+370. Splicing
+   Region: (160, 96) - 16x16
+   Confidence: 100.0%
+   Potential spliced region at (160, 96) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+371. Splicing
+   Region: (224, 112) - 16x16
+   Confidence: 100.0%
+   Potential spliced region at (224, 112) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+372. Splicing
+   Region: (240, 160) - 16x16
+   Confidence: 100.0%
+   Potential spliced region at (240, 160) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+373. Splicing
+   Region: (16, 240) - 16x16
+   Confidence: 100.0%
+   Potential spliced region at (16, 240) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+374. Splicing
+   Region: (32, 288) - 16x16
+   Confidence: 100.0%
+   Potential spliced region at (32, 288) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+375. Splicing
+   Region: (32, 304) - 16x16
+   Confidence: 100.0%
+   Potential spliced region at (32, 304) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+376. Splicing
+   Region: (0, 0) - 16x16
+   Confidence: 75.0%
+   Potential spliced region at (0, 0) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+377. Splicing
+   Region: (16, 0) - 16x16
+   Confidence: 75.0%
+   Potential spliced region at (16, 0) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+378. Splicing
+   Region: (32, 16) - 16x16
+   Confidence: 75.0%
+   Potential spliced region at (32, 16) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+379. Splicing
+   Region: (48, 32) - 16x16
+   Confidence: 75.0%
+   Potential spliced region at (48, 32) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+380. Splicing
+   Region: (64, 48) - 16x16
+   Confidence: 75.0%
+   Potential spliced region at (64, 48) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+381. Splicing
+   Region: (192, 48) - 16x16
+   Confidence: 75.0%
+   Potential spliced region at (192, 48) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+382. Splicing
+   Region: (208, 48) - 16x16
+   Confidence: 75.0%
+   Potential spliced region at (208, 48) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+383. Splicing
+   Region: (80, 64) - 16x16
+   Confidence: 75.0%
+   Potential spliced region at (80, 64) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+384. Splicing
+   Region: (112, 64) - 16x16
+   Confidence: 75.0%
+   Potential spliced region at (112, 64) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+385. Splicing
+   Region: (128, 64) - 16x16
+   Confidence: 75.0%
+   Potential spliced region at (128, 64) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+386. Splicing
+   Region: (176, 64) - 16x16
+   Confidence: 75.0%
+   Potential spliced region at (176, 64) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+387. Splicing
+   Region: (96, 80) - 16x16
+   Confidence: 75.0%
+   Potential spliced region at (96, 80) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+388. Splicing
+   Region: (144, 80) - 16x16
+   Confidence: 75.0%
+   Potential spliced region at (144, 80) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+389. Splicing
+   Region: (160, 80) - 16x16
+   Confidence: 75.0%
+   Potential spliced region at (160, 80) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+390. Splicing
+   Region: (224, 96) - 16x16
+   Confidence: 75.0%
+   Potential spliced region at (224, 96) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+391. Splicing
+   Region: (240, 144) - 16x16
+   Confidence: 75.0%
+   Potential spliced region at (240, 144) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+392. Splicing
+   Region: (16, 192) - 16x16
+   Confidence: 75.0%
+   Potential spliced region at (16, 192) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+393. Splicing
+   Region: (16, 224) - 16x16
+   Confidence: 75.0%
+   Potential spliced region at (16, 224) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+     • Noide pattern mismatch
+
+394. Splicing
+   Region: (32, 0) - 16x16
+   Confidence: 50.0%
+   Potential spliced region at (32, 0) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+
+395. Splicing
+   Region: (48, 0) - 16x16
+   Confidence: 50.0%
+   Potential spliced region at (48, 0) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+
+396. Splicing
+   Region: (64, 0) - 16x16
+   Confidence: 50.0%
+   Potential spliced region at (64, 0) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+
+397. Splicing
+   Region: (80, 0) - 16x16
+   Confidence: 50.0%
+   Potential spliced region at (80, 0) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+
+398. Splicing
+   Region: (96, 0) - 16x16
+   Confidence: 50.0%
+   Potential spliced region at (96, 0) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+
+399. Splicing
+   Region: (112, 0) - 16x16
+   Confidence: 50.0%
+   Potential spliced region at (112, 0) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+
+400. Splicing
+   Region: (128, 0) - 16x16
+   Confidence: 50.0%
+   Potential spliced region at (128, 0) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+
+401. Splicing
+   Region: (144, 0) - 16x16
+   Confidence: 50.0%
+   Potential spliced region at (144, 0) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+
+402. Splicing
+   Region: (160, 0) - 16x16
+   Confidence: 50.0%
+   Potential spliced region at (160, 0) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+
+403. Splicing
+   Region: (176, 0) - 16x16
+   Confidence: 50.0%
+   Potential spliced region at (176, 0) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+
+404. Splicing
+   Region: (192, 0) - 16x16
+   Confidence: 50.0%
+   Potential spliced region at (192, 0) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+
+405. Splicing
+   Region: (208, 0) - 16x16
+   Confidence: 50.0%
+   Potential spliced region at (208, 0) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+
+406. Splicing
+   Region: (224, 0) - 16x16
+   Confidence: 50.0%
+   Potential spliced region at (224, 0) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+
+407. Splicing
+   Region: (240, 0) - 16x16
+   Confidence: 50.0%
+   Potential spliced region at (240, 0) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+
+408. Splicing
+   Region: (256, 0) - 16x16
+   Confidence: 50.0%
+   Potential spliced region at (256, 0) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+
+409. Splicing
+   Region: (272, 0) - 13x16
+   Confidence: 50.0%
+   Potential spliced region at (272, 0) with 13x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+
+410. Splicing
+   Region: (48, 16) - 16x16
+   Confidence: 50.0%
+   Potential spliced region at (48, 16) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+
+411. Splicing
+   Region: (64, 16) - 16x16
+   Confidence: 50.0%
+   Potential spliced region at (64, 16) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+
+412. Splicing
+   Region: (80, 16) - 16x16
+   Confidence: 50.0%
+   Potential spliced region at (80, 16) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+
+413. Splicing
+   Region: (96, 16) - 16x16
+   Confidence: 50.0%
+   Potential spliced region at (96, 16) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+
+414. Splicing
+   Region: (112, 16) - 16x16
+   Confidence: 50.0%
+   Potential spliced region at (112, 16) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+
+415. Splicing
+   Region: (128, 16) - 16x16
+   Confidence: 50.0%
+   Potential spliced region at (128, 16) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+
+416. Splicing
+   Region: (144, 16) - 16x16
+   Confidence: 50.0%
+   Potential spliced region at (144, 16) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+
+417. Splicing
+   Region: (160, 16) - 16x16
+   Confidence: 50.0%
+   Potential spliced region at (160, 16) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+
+418. Splicing
+   Region: (176, 16) - 16x16
+   Confidence: 50.0%
+   Potential spliced region at (176, 16) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+
+419. Splicing
+   Region: (192, 16) - 16x16
+   Confidence: 50.0%
+   Potential spliced region at (192, 16) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+
+420. Splicing
+   Region: (208, 16) - 16x16
+   Confidence: 50.0%
+   Potential spliced region at (208, 16) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+
+421. Splicing
+   Region: (224, 16) - 16x16
+   Confidence: 50.0%
+   Potential spliced region at (224, 16) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+
+422. Splicing
+   Region: (240, 16) - 16x16
+   Confidence: 50.0%
+   Potential spliced region at (240, 16) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+
+423. Splicing
+   Region: (256, 16) - 16x16
+   Confidence: 50.0%
+   Potential spliced region at (256, 16) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+
+424. Splicing
+   Region: (272, 16) - 13x16
+   Confidence: 50.0%
+   Potential spliced region at (272, 16) with 13x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+
+425. Splicing
+   Region: (64, 32) - 16x16
+   Confidence: 50.0%
+   Potential spliced region at (64, 32) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+
+426. Splicing
+   Region: (80, 32) - 16x16
+   Confidence: 50.0%
+   Potential spliced region at (80, 32) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+
+427. Splicing
+   Region: (96, 32) - 16x16
+   Confidence: 50.0%
+   Potential spliced region at (96, 32) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+
+428. Splicing
+   Region: (112, 32) - 16x16
+   Confidence: 50.0%
+   Potential spliced region at (112, 32) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+
+429. Splicing
+   Region: (128, 32) - 16x16
+   Confidence: 50.0%
+   Potential spliced region at (128, 32) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+
+430. Splicing
+   Region: (144, 32) - 16x16
+   Confidence: 50.0%
+   Potential spliced region at (144, 32) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+
+431. Splicing
+   Region: (160, 32) - 16x16
+   Confidence: 50.0%
+   Potential spliced region at (160, 32) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+
+432. Splicing
+   Region: (176, 32) - 16x16
+   Confidence: 50.0%
+   Potential spliced region at (176, 32) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+
+433. Splicing
+   Region: (192, 32) - 16x16
+   Confidence: 50.0%
+   Potential spliced region at (192, 32) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+
+434. Splicing
+   Region: (208, 32) - 16x16
+   Confidence: 50.0%
+   Potential spliced region at (208, 32) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+
+435. Splicing
+   Region: (224, 32) - 16x16
+   Confidence: 50.0%
+   Potential spliced region at (224, 32) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+
+436. Splicing
+   Region: (240, 32) - 16x16
+   Confidence: 50.0%
+   Potential spliced region at (240, 32) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+
+437. Splicing
+   Region: (256, 32) - 16x16
+   Confidence: 50.0%
+   Potential spliced region at (256, 32) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+
+438. Splicing
+   Region: (272, 32) - 13x16
+   Confidence: 50.0%
+   Potential spliced region at (272, 32) with 13x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+
+439. Splicing
+   Region: (80, 48) - 16x16
+   Confidence: 50.0%
+   Potential spliced region at (80, 48) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+
+440. Splicing
+   Region: (96, 48) - 16x16
+   Confidence: 50.0%
+   Potential spliced region at (96, 48) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+
+441. Splicing
+   Region: (112, 48) - 16x16
+   Confidence: 50.0%
+   Potential spliced region at (112, 48) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+
+442. Splicing
+   Region: (128, 48) - 16x16
+   Confidence: 50.0%
+   Potential spliced region at (128, 48) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+
+443. Splicing
+   Region: (144, 48) - 16x16
+   Confidence: 50.0%
+   Potential spliced region at (144, 48) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+
+444. Splicing
+   Region: (160, 48) - 16x16
+   Confidence: 50.0%
+   Potential spliced region at (160, 48) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+
+445. Splicing
+   Region: (176, 48) - 16x16
+   Confidence: 50.0%
+   Potential spliced region at (176, 48) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+
+446. Splicing
+   Region: (224, 48) - 16x16
+   Confidence: 50.0%
+   Potential spliced region at (224, 48) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+
+447. Splicing
+   Region: (240, 48) - 16x16
+   Confidence: 50.0%
+   Potential spliced region at (240, 48) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+
+448. Splicing
+   Region: (256, 48) - 16x16
+   Confidence: 50.0%
+   Potential spliced region at (256, 48) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+
+449. Splicing
+   Region: (272, 48) - 13x16
+   Confidence: 50.0%
+   Potential spliced region at (272, 48) with 13x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+
+450. Splicing
+   Region: (96, 64) - 16x16
+   Confidence: 50.0%
+   Potential spliced region at (96, 64) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+
+451. Splicing
+   Region: (144, 64) - 16x16
+   Confidence: 50.0%
+   Potential spliced region at (144, 64) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+
+452. Splicing
+   Region: (160, 64) - 16x16
+   Confidence: 50.0%
+   Potential spliced region at (160, 64) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+
+453. Splicing
+   Region: (224, 64) - 16x16
+   Confidence: 50.0%
+   Potential spliced region at (224, 64) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+
+454. Splicing
+   Region: (240, 64) - 16x16
+   Confidence: 50.0%
+   Potential spliced region at (240, 64) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+
+455. Splicing
+   Region: (256, 64) - 16x16
+   Confidence: 50.0%
+   Potential spliced region at (256, 64) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+
+456. Splicing
+   Region: (272, 64) - 13x16
+   Confidence: 50.0%
+   Potential spliced region at (272, 64) with 13x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+
+457. Splicing
+   Region: (224, 80) - 16x16
+   Confidence: 50.0%
+   Potential spliced region at (224, 80) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+
+458. Splicing
+   Region: (240, 80) - 16x16
+   Confidence: 50.0%
+   Potential spliced region at (240, 80) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+
+459. Splicing
+   Region: (256, 80) - 16x16
+   Confidence: 50.0%
+   Potential spliced region at (256, 80) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+
+460. Splicing
+   Region: (272, 80) - 13x16
+   Confidence: 50.0%
+   Potential spliced region at (272, 80) with 13x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+
+461. Splicing
+   Region: (240, 96) - 16x16
+   Confidence: 50.0%
+   Potential spliced region at (240, 96) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+
+462. Splicing
+   Region: (256, 96) - 16x16
+   Confidence: 50.0%
+   Potential spliced region at (256, 96) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+
+463. Splicing
+   Region: (272, 96) - 13x16
+   Confidence: 50.0%
+   Potential spliced region at (272, 96) with 13x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+
+464. Splicing
+   Region: (240, 112) - 16x16
+   Confidence: 50.0%
+   Potential spliced region at (240, 112) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+
+465. Splicing
+   Region: (256, 112) - 16x16
+   Confidence: 50.0%
+   Potential spliced region at (256, 112) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+
+466. Splicing
+   Region: (272, 112) - 13x16
+   Confidence: 50.0%
+   Potential spliced region at (272, 112) with 13x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+
+467. Splicing
+   Region: (240, 128) - 16x16
+   Confidence: 50.0%
+   Potential spliced region at (240, 128) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+
+468. Splicing
+   Region: (256, 128) - 16x16
+   Confidence: 50.0%
+   Potential spliced region at (256, 128) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+
+469. Splicing
+   Region: (272, 128) - 13x16
+   Confidence: 50.0%
+   Potential spliced region at (272, 128) with 13x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+
+470. Splicing
+   Region: (256, 144) - 16x16
+   Confidence: 50.0%
+   Potential spliced region at (256, 144) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+
+471. Splicing
+   Region: (272, 144) - 13x16
+   Confidence: 50.0%
+   Potential spliced region at (272, 144) with 13x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+
+472. Splicing
+   Region: (256, 160) - 16x16
+   Confidence: 50.0%
+   Potential spliced region at (256, 160) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+
+473. Splicing
+   Region: (272, 160) - 13x16
+   Confidence: 50.0%
+   Potential spliced region at (272, 160) with 13x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+
+474. Splicing
+   Region: (256, 176) - 16x16
+   Confidence: 50.0%
+   Potential spliced region at (256, 176) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+
+475. Splicing
+   Region: (272, 176) - 13x16
+   Confidence: 50.0%
+   Potential spliced region at (272, 176) with 13x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+
+476. Splicing
+   Region: (256, 192) - 16x16
+   Confidence: 50.0%
+   Potential spliced region at (256, 192) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+
+477. Splicing
+   Region: (272, 192) - 13x16
+   Confidence: 50.0%
+   Potential spliced region at (272, 192) with 13x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+
+478. Splicing
+   Region: (16, 208) - 16x16
+   Confidence: 50.0%
+   Potential spliced region at (16, 208) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+
+479. Splicing
+   Region: (256, 208) - 16x16
+   Confidence: 50.0%
+   Potential spliced region at (256, 208) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+
+480. Splicing
+   Region: (272, 208) - 13x16
+   Confidence: 50.0%
+   Potential spliced region at (272, 208) with 13x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+
+481. Splicing
+   Region: (256, 224) - 16x16
+   Confidence: 50.0%
+   Potential spliced region at (256, 224) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+
+482. Splicing
+   Region: (272, 224) - 13x16
+   Confidence: 50.0%
+   Potential spliced region at (272, 224) with 13x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+
+483. Splicing
+   Region: (256, 240) - 16x16
+   Confidence: 50.0%
+   Potential spliced region at (256, 240) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+
+484. Splicing
+   Region: (272, 240) - 13x16
+   Confidence: 50.0%
+   Potential spliced region at (272, 240) with 13x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+
+485. Splicing
+   Region: (256, 256) - 16x16
+   Confidence: 50.0%
+   Potential spliced region at (256, 256) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+
+486. Splicing
+   Region: (272, 256) - 13x16
+   Confidence: 50.0%
+   Potential spliced region at (272, 256) with 13x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+
+487. Splicing
+   Region: (256, 272) - 16x16
+   Confidence: 50.0%
+   Potential spliced region at (256, 272) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+
+488. Splicing
+   Region: (272, 272) - 13x16
+   Confidence: 50.0%
+   Potential spliced region at (272, 272) with 13x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+
+489. Splicing
+   Region: (256, 288) - 16x16
+   Confidence: 50.0%
+   Potential spliced region at (256, 288) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+
+490. Splicing
+   Region: (272, 288) - 13x16
+   Confidence: 50.0%
+   Potential spliced region at (272, 288) with 13x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+
+491. Splicing
+   Region: (256, 304) - 16x16
+   Confidence: 50.0%
+   Potential spliced region at (256, 304) with 16x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+
+492. Splicing
+   Region: (272, 304) - 13x16
+   Confidence: 50.0%
+   Potential spliced region at (272, 304) with 13x16 size
+   Evidence:
+     • Color histogram incosistency
+     • Unnatrural edge patterns
+
+493. Retouching
+   Region: (192, 64) - 16x16
+   Confidence: 45.0%
+   Texture inconsistency suggesting retouching
+   Evidence:
+     • Abnormal texture pattern
+
+494. Retouching
+   Region: (128, 128) - 16x16
+   Confidence: 63.5%
+   Texture inconsistency suggesting retouching
+   Evidence:
+     • Abnormal texture pattern
+
+495. Retouching
+   Region: (144, 128) - 16x16
+   Confidence: 39.2%
+   Texture inconsistency suggesting retouching
+   Evidence:
+     • Abnormal texture pattern
+
+496. Retouching
+   Region: (224, 128) - 16x16
+   Confidence: 34.3%
+   Texture inconsistency suggesting retouching
+   Evidence:
+     • Abnormal texture pattern
+
+497. Retouching
+   Region: (112, 144) - 16x16
+   Confidence: 71.2%
+   Texture inconsistency suggesting retouching
+   Evidence:
+     • Abnormal texture pattern
+
+498. Retouching
+   Region: (128, 144) - 16x16
+   Confidence: 44.8%
+   Texture inconsistency suggesting retouching
+   Evidence:
+     • Abnormal texture pattern
+
+499. Retouching
+   Region: (160, 144) - 16x16
+   Confidence: 33.2%
+   Texture inconsistency suggesting retouching
+   Evidence:
+     • Abnormal texture pattern
+
+500. Retouching
+   Region: (224, 144) - 16x16
+   Confidence: 35.4%
+   Texture inconsistency suggesting retouching
+   Evidence:
+     • Abnormal texture pattern
+
+501. Retouching
+   Region: (112, 160) - 16x16
+   Confidence: 77.1%
+   Texture inconsistency suggesting retouching
+   Evidence:
+     • Abnormal texture pattern
+
+502. Retouching
+   Region: (128, 160) - 16x16
+   Confidence: 51.1%
+   Texture inconsistency suggesting retouching
+   Evidence:
+     • Abnormal texture pattern
+
+503. Retouching
+   Region: (224, 160) - 16x16
+   Confidence: 39.2%
+   Texture inconsistency suggesting retouching
+   Evidence:
+     • Abnormal texture pattern
+
+504. Retouching
+   Region: (96, 176) - 16x16
+   Confidence: 44.6%
+   Texture inconsistency suggesting retouching
+   Evidence:
+     • Abnormal texture pattern
+
+505. Retouching
+   Region: (112, 176) - 16x16
+   Confidence: 47.7%
+   Texture inconsistency suggesting retouching
+   Evidence:
+     • Abnormal texture pattern
+
+506. Retouching
+   Region: (224, 176) - 16x16
+   Confidence: 40.3%
+   Texture inconsistency suggesting retouching
+   Evidence:
+     • Abnormal texture pattern
+
+507. Retouching
+   Region: (112, 192) - 16x16
+   Confidence: 41.6%
+   Texture inconsistency suggesting retouching
+   Evidence:
+     • Abnormal texture pattern
+
+508. Retouching
+   Region: (128, 192) - 16x16
+   Confidence: 34.5%
+   Texture inconsistency suggesting retouching
+   Evidence:
+     • Abnormal texture pattern
+
+509. Retouching
+   Region: (224, 192) - 16x16
+   Confidence: 37.4%
+   Texture inconsistency suggesting retouching
+   Evidence:
+     • Abnormal texture pattern
+
+510. Retouching
+   Region: (96, 208) - 16x16
+   Confidence: 32.1%
+   Texture inconsistency suggesting retouching
+   Evidence:
+     • Abnormal texture pattern
+
+511. Retouching
+   Region: (224, 208) - 16x16
+   Confidence: 37.6%
+   Texture inconsistency suggesting retouching
+   Evidence:
+     • Abnormal texture pattern
+
+512. Retouching
+   Region: (128, 224) - 16x16
+   Confidence: 46.5%
+   Texture inconsistency suggesting retouching
+   Evidence:
+     • Abnormal texture pattern
+
+513. Retouching
+   Region: (144, 224) - 16x16
+   Confidence: 55.9%
+   Texture inconsistency suggesting retouching
+   Evidence:
+     • Abnormal texture pattern
+
+514. Retouching
+   Region: (224, 224) - 16x16
+   Confidence: 39.8%
+   Texture inconsistency suggesting retouching
+   Evidence:
+     • Abnormal texture pattern
+
+515. Retouching
+   Region: (112, 240) - 16x16
+   Confidence: 36.5%
+   Texture inconsistency suggesting retouching
+   Evidence:
+     • Abnormal texture pattern
+
+516. Retouching
+   Region: (128, 240) - 16x16
+   Confidence: 40.3%
+   Texture inconsistency suggesting retouching
+   Evidence:
+     • Abnormal texture pattern
+
+517. Retouching
+   Region: (224, 240) - 16x16
+   Confidence: 41.2%
+   Texture inconsistency suggesting retouching
+   Evidence:
+     • Abnormal texture pattern
+
+518. Retouching
+   Region: (112, 256) - 16x16
+   Confidence: 100.0%
+   Texture inconsistency suggesting retouching
+   Evidence:
+     • Abnormal texture pattern
+
+519. Retouching
+   Region: (128, 256) - 16x16
+   Confidence: 53.8%
+   Texture inconsistency suggesting retouching
+   Evidence:
+     • Abnormal texture pattern
+
+520. Retouching
+   Region: (224, 256) - 16x16
+   Confidence: 37.2%
+   Texture inconsistency suggesting retouching
+   Evidence:
+     • Abnormal texture pattern
+
+521. Retouching
+   Region: (96, 272) - 16x16
+   Confidence: 36.1%
+   Texture inconsistency suggesting retouching
+   Evidence:
+     • Abnormal texture pattern
+
+522. Retouching
+   Region: (112, 272) - 16x16
+   Confidence: 49.2%
+   Texture inconsistency suggesting retouching
+   Evidence:
+     • Abnormal texture pattern
+
+523. Retouching
+   Region: (224, 272) - 16x16
+   Confidence: 40.1%
+   Texture inconsistency suggesting retouching
+   Evidence:
+     • Abnormal texture pattern
+
+524. Retouching
+   Region: (112, 288) - 16x16
+   Confidence: 52.6%
+   Texture inconsistency suggesting retouching
+   Evidence:
+     • Abnormal texture pattern
+
+525. Retouching
+   Region: (224, 288) - 16x16
+   Confidence: 40.8%
+   Texture inconsistency suggesting retouching
+   Evidence:
+     • Abnormal texture pattern
+
+526. Retouching
+   Region: (224, 304) - 16x16
+   Confidence: 41.1%
+   Texture inconsistency suggesting retouching
+   Evidence:
+     • Abnormal texture pattern
+
+527. Retouching
+   Region: (64, 320) - 16x5
+   Confidence: 30.6%
+   Texture inconsistency suggesting retouching
+   Evidence:
+     • Abnormal texture pattern
+
+528. Retouching
+   Region: (80, 320) - 16x5
+   Confidence: 61.2%
+   Texture inconsistency suggesting retouching
+   Evidence:
+     • Abnormal texture pattern
+
+529. Retouching
+   Region: (224, 320) - 16x5
+   Confidence: 41.5%
+   Texture inconsistency suggesting retouching
+   Evidence:
+     • Abnormal texture pattern
+
+530. Retouching
+   Region: (128, 128) - 16x106
+   Confidence: 67.3%
+   Blur inconsistency suggesting retouching
+   Evidence:
+     • Abnormal blur pattern
+
+531. Retouching
+   Region: (112, 144) - 16x98
+   Confidence: 73.2%
+   Blur inconsistency suggesting retouching
+   Evidence:
+     • Abnormal blur pattern
+
+532. Retouching
+   Region: (128, 144) - 16x98
+   Confidence: 41.0%
+   Blur inconsistency suggesting retouching
+   Evidence:
+     • Abnormal blur pattern
+
+533. Retouching
+   Region: (160, 144) - 16x98
+   Confidence: 57.3%
+   Blur inconsistency suggesting retouching
+   Evidence:
+     • Abnormal blur pattern
+
+534. Retouching
+   Region: (176, 144) - 16x98
+   Confidence: 34.6%
+   Blur inconsistency suggesting retouching
+   Evidence:
+     • Abnormal blur pattern
+
+535. Retouching
+   Region: (112, 160) - 16x90
+   Confidence: 100.0%
+   Blur inconsistency suggesting retouching
+   Evidence:
+     • Abnormal blur pattern
+
+536. Retouching
+   Region: (128, 160) - 16x90
+   Confidence: 66.9%
+   Blur inconsistency suggesting retouching
+   Evidence:
+     • Abnormal blur pattern
+
+537. Retouching
+   Region: (96, 176) - 16x82
+   Confidence: 34.3%
+   Blur inconsistency suggesting retouching
+   Evidence:
+     • Abnormal blur pattern
+
+538. Retouching
+   Region: (112, 176) - 16x82
+   Confidence: 46.2%
+   Blur inconsistency suggesting retouching
+   Evidence:
+     • Abnormal blur pattern
+
+539. Retouching
+   Region: (112, 192) - 16x74
+   Confidence: 65.8%
+   Blur inconsistency suggesting retouching
+   Evidence:
+     • Abnormal blur pattern
+
+540. Retouching
+   Region: (144, 224) - 16x58
+   Confidence: 76.9%
+   Blur inconsistency suggesting retouching
+   Evidence:
+     • Abnormal blur pattern
+
+541. Retouching
+   Region: (128, 240) - 16x50
+   Confidence: 30.3%
+   Blur inconsistency suggesting retouching
+   Evidence:
+     • Abnormal blur pattern
+
+542. Retouching
+   Region: (160, 240) - 16x50
+   Confidence: 81.1%
+   Blur inconsistency suggesting retouching
+   Evidence:
+     • Abnormal blur pattern
+
+543. Retouching
+   Region: (112, 256) - 16x42
+   Confidence: 100.0%
+   Blur inconsistency suggesting retouching
+   Evidence:
+     • Abnormal blur pattern
+
+544. Retouching
+   Region: (128, 256) - 16x42
+   Confidence: 78.7%
+   Blur inconsistency suggesting retouching
+   Evidence:
+     • Abnormal blur pattern
+
+545. Retouching
+   Region: (96, 272) - 16x34
+   Confidence: 41.5%
+   Blur inconsistency suggesting retouching
+   Evidence:
+     • Abnormal blur pattern
+
+546. Retouching
+   Region: (112, 272) - 16x34
+   Confidence: 40.8%
+   Blur inconsistency suggesting retouching
+   Evidence:
+     • Abnormal blur pattern
+
+547. Retouching
+   Region: (112, 288) - 16x26
+   Confidence: 61.5%
+   Blur inconsistency suggesting retouching
+   Evidence:
+     • Abnormal blur pattern
+
+548. Unknown
+   Region: (0, 0) - 285x325
+   Confidence: 67.9%
+   Image shows signs of double JPEG compression
+   Evidence:
+     • Estimated quality: 95
+     • Double compression likelihood: 67.9%
+
+═══════════════════════════════════════════════════════════════
+                    END OF REPORT                              
+═══════════════════════════════════════════════════════════════

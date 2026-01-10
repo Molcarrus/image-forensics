@@ -377,16 +377,15 @@ impl Visualizer {
         color: Rgb<u8>
     ) {
         let (width, height) = image.dimensions();
-        
         let dx = (x1 as i32 - x0 as i32).abs();
         let dy = -(y1 as i32 - y0 as i32).abs();
         let sx = if x0 < x1 { 1i32 } else { -1i32 };
         let sy = if y0 < y1 { 1i32 } else { -1i32 };
-        let mut err = dx * dy;
-        
+        let mut err = dx + dy;
+                
         let mut x = x0 as i32;
         let mut y = y0 as i32;
-        
+                
         loop {
             if x >= 0 && x < width as i32 && y >= 0 && y < height as i32 {
                 for dy in -1i32..=1 {
@@ -397,16 +396,16 @@ impl Visualizer {
                     }
                 }
             }
-            
+                    
             if x == x1 as i32 && y == y1 as i32 {
                 break;
             }
-            
+                    
             let e2 = 2 * err;
             if e2 >= dy {
                 err += dy;
-                x += sx; 
-            } 
+                x += sx;
+            }
             if e2 <= dx {
                 err += dx;
                 y += sy;
@@ -567,6 +566,34 @@ impl Visualizer {
         }
         
         result
+    }
+    
+    pub fn create_analysis_grid(&self, original: &RgbImage, report: &FullAnalysisReport) -> RgbImage {
+        let ela_vis = self.visualize_ela(original, &report.ela);
+        let copy_move_vis = self.visualize_copy_move(original, &report.copy_move);
+        let noise_vis = self.visualize_noise(original, &report.noise);
+        
+        let combined = self.create_combined_overview(original, &report.ela, &report.copy_move, &report.noise);
+        
+        let (w, h) = original.dimensions();
+        let grid_width = w * 2 + 10;
+        let grid_height = h * 2 + 10;
+        
+        let mut grid = RgbImage::from_pixel(grid_width, grid_height, Rgb([20, 20, 20]));
+        
+        self.copy_image_to(&mut grid, original, 0, 0);
+        self.draw_label(&mut grid, 5, 5, "Original", Rgb([255, 255, 255]));
+        
+        self.copy_image_to(&mut grid, &ela_vis, w + 10, 0);
+        self.draw_label(&mut grid, w + 15, 5, "ELA", Rgb([255, 255, 255]));
+        
+        self.copy_image_to(&mut grid, &copy_move_vis, 0, h + 10);
+        self.draw_label(&mut grid, 5, h + 15, "Copy-Move", Rgb([255, 255, 255]));
+        
+        self.copy_image_to(&mut grid, &combined, w + 10, h + 10);
+        self.draw_label(&mut grid, w + 15, h + 15, "Combined", Rgb([255, 255, 255]));
+        
+        grid
     }
     
     fn copy_image_to(

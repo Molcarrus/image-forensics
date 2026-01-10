@@ -1,0 +1,30 @@
+{
+  "tampering_probability": 0.6701587301587301,
+  "ela_analysis": {
+    "max_difference": 11.666666666666666,
+    "mean_difference": 17.401716599190284,
+    "std_deviation": 15.666596688329681,
+    "suspicious_region_count": 0
+  },
+  "copy_move_analysis": {
+    "match_count": 66,
+    "confidence": 0.9995198384357722
+  },
+  "noise_analysis": {
+    "inconsistency_score": 0.6904761904761905,
+    "estimated_noise_level": 1.4826,
+    "anomalous_region_count": 261
+  },
+  "jpeg_analysis": {
+    "quality_estimate": 95,
+    "ghost_detected": false,
+    "double_compression_likelihood": 0.6793253233088388
+  },
+  "metadata": {
+    "camera_info": null,
+    "software": null,
+    "suspicious_indicators": [
+      "No EXIF data found"
+    ]
+  }
+}
