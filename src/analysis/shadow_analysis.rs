@@ -81,12 +81,14 @@ impl ShadowAnalyzer {
             &gradient_direction
         );
         
-        let (dominant_light_direction, dominant_direction_confidence) = self.find_dominant_direction(&shadow_regions);
+        let (dominant_light_direction, dominant_direction_confidence) = 
+            self.find_dominant_direction(&shadow_regions);
         
         let estimated_light_sources = self.estimate_light_sources(&shadow_regions);
         
-        let inconsistent_regions = self.find_incosistent_regions(
-            &shadow_regions, dominant_light_direction
+        let inconsistent_regions = self.find_inconsistent_regions(
+            &shadow_regions, 
+            dominant_light_direction
         );
         
         let direction_map = self.create_direction_map(
@@ -124,10 +126,11 @@ impl ShadowAnalyzer {
         let (width, height) = gray.dimensions();
         let mut shadow_mask = GrayImage::new(width, height);
         
-        let mut intensities = gray
+        let mut intensities: Vec<u8> = gray
             .pixels()
             .map(|p| p[0])
-            .collect::<Vec<_>>();
+            .collect();
+        intensities.sort_unstable();
         
         let low_percentile = intensities[intensities.len() / 10];
         let adaptive_threshold = self.config.shadow_threshold.min(low_percentile + 20);
@@ -143,9 +146,7 @@ impl ShadowAnalyzer {
             }
         }
         
-        let cleaned = self.morphological_cleanup(&shadow_mask);
-        
-        cleaned
+        self.morphological_cleanup(&shadow_mask)
     }
     
     fn is_shadow_pixel(&self, intensity: u8, pixel: &Rgb<u8>, threshold: u8) -> bool {
@@ -179,15 +180,9 @@ impl ShadowAnalyzer {
     }
     
     fn morphological_cleanup(&self, mask: &GrayImage) -> GrayImage {
-        let (width, height) = mask.dimensions();
-        let mut result = mask.clone();
-        
-        let eroded = self.erode(&result, 2);
-        result = self.dilate(&eroded, 2);
-        
-        result = self.remove_small_regions(&result, self.config.min_shadow_size);
-        
-        result
+        let eroded = self.erode(mask, 2);
+        let dilated = self.dilate(&eroded, 2);
+        self.remove_small_regions(&dilated, self.config.min_shadow_size)
     }
     
     fn erode(&self, image: &GrayImage, radius: i32) -> GrayImage {
@@ -290,8 +285,8 @@ impl ShadowAnalyzer {
         let mut magnitude = GrayImage::new(width, height);
         let mut direction = GrayImage::new(width, height);
         
-        for y in 1..height-1 {
-            for x in 1..width-1 {
+        for y in 1..height - 1 {
+            for x in 1..width - 1 {
                 let gx = self.sobel_x(gray, x, y);
                 let gy = self.sobel_y(gray, x, y);
                 
@@ -318,7 +313,8 @@ impl ShadowAnalyzer {
             )[0] as f64 
         };
         
-        -get(-1, -1) - 2.0 * get(-1, 0) - get(-1, 1) + get(1, -1) + 2.0 * get(1, 0) + get(1, 1)
+        -get(-1, -1) - 2.0 * get(-1, 0) - get(-1, 1) 
+        + get(1, -1) + 2.0 * get(1, 0) + get(1, 1)
     }
     
     fn sobel_y(&self, gray: &GrayImage, x: u32, y: u32) -> f64 {
@@ -331,7 +327,8 @@ impl ShadowAnalyzer {
             )[0] as f64 
         };
         
-        -get(-1, -1) - 2.0 * get(0, -1) - get(1, -1) + get(-1, 1) + 2.0 * get(0, 1) + get(1, 1)
+        -get(-1, -1) - 2.0 * get(0, -1) - get(1, -1) 
+        + get(-1, 1) + 2.0 * get(0, 1) + get(1, 1)
     }
     
     fn analyze_shadow_regions(
@@ -359,7 +356,9 @@ impl ShadowAnalyzer {
                     );
                     
                     if let Some(info) = region_info {
-                        if info.region.width >= self.config.min_shadow_size / 2 || info.region.height >= self.config.min_shadow_size / 2 {
+                        if info.region.width >= self.config.min_shadow_size / 2 
+                            || info.region.height >= self.config.min_shadow_size / 2 
+                        {
                             regions.push(info);
                         }
                     }
@@ -427,17 +426,18 @@ impl ShadowAnalyzer {
             total_intensity += shadow_mask.get_pixel(x, y)[0] as f64;
             pixel_count += 1;
             
-            if x > 0 { stack.push((x-1, y)); }
-            if x + 1 < width { stack.push((x+1, y)); }
-            if y > 0 { stack.push((x, y-1)); }
-            if y + 1 < height { stack.push((x, y+1)); }
+            if x > 0 { stack.push((x - 1, y)); }
+            if x + 1 < width { stack.push((x + 1, y)); }
+            if y > 0 { stack.push((x, y - 1)); }
+            if y + 1 < height { stack.push((x, y + 1)); }
         }
         
         if pixel_count < self.config.min_shadow_size as usize || edge_directions.is_empty() {
             return None;
         }
         
-        let (light_direction, direction_confidence) = self.calculate_light_direction(&edge_directions, &edge_magnitudes);
+        let (light_direction, direction_confidence) = 
+            self.calculate_light_direction(&edge_directions, &edge_magnitudes);
         
         let edge_sharpness = if !edge_magnitudes.is_empty() {
             edge_magnitudes.iter().sum::<f64>() / edge_magnitudes.len() as f64 / 255.0
@@ -506,9 +506,7 @@ impl ShadowAnalyzer {
         let mean_cos = cos_sum / weight_sum;
         
         let mean_direction = mean_sin.atan2(mean_cos);
-        
-        let r = (mean_sin * mean_sin + mean_cos * mean_cos).sqrt();
-        let confidence = r;
+        let confidence = (mean_sin * mean_sin + mean_cos * mean_cos).sqrt();
         
         (mean_direction, confidence)
     }
@@ -523,7 +521,8 @@ impl ShadowAnalyzer {
         let mut weight_sum = 0.0;
         
         for region in regions {
-            let weight = region.direction_confidence * (region.region.width * region.region.height) as f64;
+            let weight = region.direction_confidence 
+                * (region.region.width * region.region.height) as f64;
             sin_sum += region.light_direction.sin() * weight;
             cos_sum += region.light_direction.cos() * weight;
             weight_sum += weight;
@@ -544,11 +543,11 @@ impl ShadowAnalyzer {
             return 1;
         }
         
-        let mut directions = regions
+        let mut directions: Vec<f64> = regions
             .iter()
             .filter(|r| r.direction_confidence > 0.3)
             .map(|r| r.light_direction)
-            .collect::<Vec<_>>();
+            .collect();
         
         if directions.is_empty() {
             return 1;
@@ -560,7 +559,7 @@ impl ShadowAnalyzer {
         let mut clusters = 1;
         
         for i in 1..directions.len() {
-            let mut gap = directions[i] - directions[i-1];
+            let mut gap = directions[i] - directions[i - 1];
             
             if gap < 0.0 {
                 gap += 2.0 * PI;
@@ -571,17 +570,16 @@ impl ShadowAnalyzer {
             }
         }
         
-        let wrap_gap = (directions[0] + 2.0 * PI) - directions[directions.len() - 1];
-        if wrap_gap > gap_threshold && clusters > 1 {
-            clusters = clusters;
-        }
-        
         clusters.min(5)
     }
     
-    fn find_incosistent_regions(&self, regions: &[ShadowRegion], dominant_direction: f64) -> Vec<SRegion> {
+    fn find_inconsistent_regions(
+        &self, 
+        regions: &[ShadowRegion], 
+        dominant_direction: f64
+    ) -> Vec<SRegion> {
         let tolerance = self.config.angle_tolerance.to_radians();
-        let mut incosistent = Vec::new();
+        let mut inconsistent = Vec::new();
         
         for shadow_region in regions {
             if shadow_region.direction_confidence < 0.2 {
@@ -594,11 +592,11 @@ impl ShadowAnalyzer {
             }
             
             if diff > tolerance {
-                incosistent.push(shadow_region.region);
+                inconsistent.push(shadow_region.region);
             }
         }
         
-        incosistent
+        inconsistent
     }
     
     fn create_direction_map(
@@ -608,7 +606,6 @@ impl ShadowAnalyzer {
         dominant_direction: f64,
     ) -> RgbImage {
         let mut vis = original.clone();
-        let (width, height) = vis.dimensions();
         
         for shadow_region in regions {
             let mut diff = (shadow_region.light_direction - dominant_direction).abs();
@@ -642,7 +639,14 @@ impl ShadowAnalyzer {
         let end_x = indicator_x as f64 + arrow_len * dominant_direction.cos();
         let end_y = indicator_y as f64 - arrow_len * dominant_direction.sin();
         
-        self.draw_arrow(&mut vis, indicator_x, indicator_y, end_x as u32, end_y as u32, Rgb([255, 255, 0]));
+        self.draw_arrow(
+            &mut vis, 
+            indicator_x, 
+            indicator_y, 
+            end_x as u32, 
+            end_y as u32, 
+            Rgb([255, 255, 0])
+        );
         
         vis 
     }
@@ -654,8 +658,9 @@ impl ShadowAnalyzer {
             if region.y < height {
                 image.put_pixel(x, region.y, color);
             }
-            if region.y + region.height - 1 < height {
-                image.put_pixel(x, region.y + region.height - 1, color);
+            let bottom_y = region.y + region.height.saturating_sub(1);
+            if bottom_y < height {
+                image.put_pixel(x, bottom_y, color);
             }
         }
         
@@ -663,45 +668,30 @@ impl ShadowAnalyzer {
             if region.x < width {
                 image.put_pixel(region.x, y, color);
             }
-            if region.x + region.width - 1 < width {
-                image.put_pixel(region.x + region.width - 1, y, color);
+            let right_x = region.x + region.width.saturating_sub(1);
+            if right_x < width {
+                image.put_pixel(right_x, y, color);
             }
         }
     }
     
     fn draw_arrow(&self, image: &mut RgbImage, x0: u32, y0: u32, x1: u32, y1: u32, color: Rgb<u8>) {
+        self.draw_line(image, x0, y0, x1, y1, color);
+        
         let (width, height) = image.dimensions();
+        let angle = (y1 as f64 - y0 as f64).atan2(x1 as f64 - x0 as f64);
+        let arrow_size = 8.0;
+        let arrow_angle = 0.5; 
         
-        let dx = (x1 as i32 - x0 as i32).abs();
-        let dy = -(y1 as i32 - y0 as i32).abs();
-        let sx = if x0 < x1 { 1i32 } else { -1i32 };
-        let sy = if y0 < y1 { 1i32 } else { -1i32 };
-        let mut err = dx + dy;
-        
-        let mut x = x0 as i32;
-        let mut y = y0 as i32;
-        
-        loop {
-            if x >= 0 && x < width as i32 && y >= 0 && y < height as i32 {
-                image.put_pixel(x as u32, y as u32, color);
-            }
+        for &offset in &[-arrow_angle, arrow_angle] {
+            let head_angle = angle + PI + offset;
+            let hx = x1 as f64 + arrow_size * head_angle.cos();
+            let hy = y1 as f64 + arrow_size * head_angle.sin();
             
-            if x == x1 as i32 && y == y1 as i32 {
-                break;
-            }
-            
-            let e2 = 2 * err;
-            if e2 >= dy {
-                err += dy;
-                x += sx;
-            }
-            if e2 <= dx {
-                err += dx;
-                y += sy;
+            if hx >= 0.0 && hx < width as f64 && hy >= 0.0 && hy < height as f64 {
+                self.draw_line(image, x1, y1, hx as u32, hy as u32, color);
             }
         }
-        
-        let angle = (y1 as f64 - y0 as f64).atan2(x1 as f64 - x0 as f64);
     }
     
     fn draw_line(&self, image: &mut RgbImage, x0: u32, y0: u32, x1: u32, y1: u32, color: Rgb<u8>) {
@@ -737,7 +727,11 @@ impl ShadowAnalyzer {
         }
     }
     
-    fn calculate_consistency_score(&self, regions: &[ShadowRegion], dominant_direction: f64) -> f64 {
+    fn calculate_consistency_score(
+        &self, 
+        regions: &[ShadowRegion], 
+        dominant_direction: f64
+    ) -> f64 {
         if regions.is_empty() {
             return 1.0;
         }
@@ -747,13 +741,18 @@ impl ShadowAnalyzer {
         let mut total_weight = 0.0;
         
         for region in regions {
-            let weight = region.direction_confidence * (region.region.width * region.region.height) as f64;
+            let weight = region.direction_confidence 
+                * (region.region.width * region.region.height) as f64;
             
             let mut diff = (region.light_direction - dominant_direction).abs();
             if diff > PI {
                 diff = 2.0 * PI - diff;
+            }
+            
+            if diff < tolerance {
+                consistent_weight += weight;  
             } else if diff < tolerance * 2.0 {
-                consistent_weight += weight * 0.5;
+                consistent_weight += weight * 0.5;  
             }
             
             total_weight += weight;
