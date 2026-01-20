@@ -11,16 +11,17 @@
 
 use image::GenericImageView;
 use image_forensics::{
-    ForensicsAnalyzer, AnalysisConfig, error::Result, FullAnalysisReport,
+    AnalysisConfig, ForensicsAnalyzer, FullAnalysisReport,
     detection::{
-        Detector, 
-        DetectionResult, 
-        tampering::{TamperingDetector, TamperingConfig},
-        splicing::{SplicingDetector, SplicingConfig}, 
-        ConfidenceLevel, 
-        ManipulationType,
+        ConfidenceLevel, DetectionResult, Detector, ManipulationType,
+        splicing::{SplicingConfig, SplicingDetector},
+        tampering::{TamperingConfig, TamperingDetector},
     },
-    report::{JsonReport, visualization::{Visualizer, VisualizationConfig, ColorScheme}},
+    error::Result,
+    report::{
+        JsonReport,
+        visualization::{ColorScheme, VisualizationConfig, Visualizer},
+    },
 };
 use std::env;
 use std::fs;
@@ -29,41 +30,44 @@ use std::time::Instant;
 
 fn main() -> Result<()> {
     let args: Vec<String> = env::args().collect();
-    
+
     if args.len() < 2 {
         print_usage(&args[0]);
         return Ok(());
     }
-    
+
     let image_path = &args[1];
-    let output_dir = args.get(2).map(|s| s.as_str()).unwrap_or("./forensics_report");
-    
+    let output_dir = args
+        .get(2)
+        .map(|s| s.as_str())
+        .unwrap_or("./forensics_report");
+
     // Verify input
     if !Path::new(image_path).exists() {
         eprintln!("❌ Error: Image file '{}' not found", image_path);
         std::process::exit(1);
     }
-    
+
     // Create output directory structure
     fs::create_dir_all(format!("{}/visualizations", output_dir))?;
     fs::create_dir_all(format!("{}/analysis", output_dir))?;
-    
+
     print_header();
     println!("📁 Analyzing: {}", image_path);
     println!("📂 Output:    {}/", output_dir);
     println!();
-    
+
     let total_start = Instant::now();
-    
+
     // ═══════════════════════════════════════════════════════════════════
     // PHASE 1: LOAD AND PREPARE
     // ═══════════════════════════════════════════════════════════════════
     println!("┌─────────────────────────────────────────────────────────────┐");
     println!("│ PHASE 1: Loading and Preparation                           │");
     println!("└─────────────────────────────────────────────────────────────┘");
-    
+
     let start = Instant::now();
-    
+
     // Configure the analyzer
     let config = AnalysisConfig {
         ela_quality: 95,
@@ -72,72 +76,91 @@ fn main() -> Result<()> {
         parallel: true,
         min_match_distance: 50,
     };
-    
-    let analyzer = ForensicsAnalyzer::new(image_path)?
-        .with_config(config.clone());
-    
+
+    let analyzer = ForensicsAnalyzer::new(image_path)?.with_config(config.clone());
+
     let image = image::open(image_path)?;
     let (width, height) = image.dimensions();
-    
-    println!("  ✓ Image loaded: {}x{} pixels ({:.2} MP)", 
-             width, height, 
-             (width as f64 * height as f64) / 1_000_000.0);
+
+    println!(
+        "  ✓ Image loaded: {}x{} pixels ({:.2} MP)",
+        width,
+        height,
+        (width as f64 * height as f64) / 1_000_000.0
+    );
     println!("  ✓ Configuration applied");
     println!("  ⏱ Time: {:?}", start.elapsed());
     println!();
-    
+
     // ═══════════════════════════════════════════════════════════════════
     // PHASE 2: CORE ANALYSIS
     // ═══════════════════════════════════════════════════════════════════
     println!("┌─────────────────────────────────────────────────────────────┐");
     println!("│ PHASE 2: Core Forensic Analysis                            │");
     println!("└─────────────────────────────────────────────────────────────┘");
-    
+
     let start = Instant::now();
-    
+
     print!("  Running full analysis suite...");
     let full_report = analyzer.full_analysis()?;
     println!(" ✓");
-    
+
     // Save individual analysis results
     println!("  Saving analysis outputs:");
-    
+
     // ELA
-    full_report.ela.save(format!("{}/analysis/ela.png", output_dir))?;
-    full_report.ela.difference_map.save(format!("{}/analysis/ela_difference.png", output_dir))?;
+    full_report
+        .ela
+        .save(format!("{}/analysis/ela.png", output_dir))?;
+    full_report
+        .ela
+        .difference_map
+        .save(format!("{}/analysis/ela_difference.png", output_dir))?;
     println!("    ✓ ELA analysis");
-    
+
     // Copy-Move
-    full_report.copy_move.visualization.save(format!("{}/analysis/copy_move.png", output_dir))?;
+    full_report
+        .copy_move
+        .visualization
+        .save(format!("{}/analysis/copy_move.png", output_dir))?;
     println!("    ✓ Copy-move detection");
-    
+
     // Noise
-    full_report.noise.noise_map.save(format!("{}/analysis/noise_map.png", output_dir))?;
-    full_report.noise.local_variance_map.save(format!("{}/analysis/noise_variance.png", output_dir))?;
+    full_report
+        .noise
+        .noise_map
+        .save(format!("{}/analysis/noise_map.png", output_dir))?;
+    full_report
+        .noise
+        .local_variance_map
+        .save(format!("{}/analysis/noise_variance.png", output_dir))?;
     println!("    ✓ Noise analysis");
-    
+
     // JPEG
-    full_report.jpeg.blocking_artifact_map.save(format!("{}/analysis/jpeg_blocking.png", output_dir))?;
+    full_report
+        .jpeg
+        .blocking_artifact_map
+        .save(format!("{}/analysis/jpeg_blocking.png", output_dir))?;
     if let Some(ref ghost_map) = full_report.jpeg.ghost_map {
         ghost_map.save(format!("{}/analysis/jpeg_ghost.png", output_dir))?;
     }
     println!("    ✓ JPEG analysis");
-    
+
     println!("  ⏱ Time: {:?}", start.elapsed());
     println!();
-    
+
     // Print analysis summary
     print_analysis_summary(&full_report);
-    
+
     // ═══════════════════════════════════════════════════════════════════
     // PHASE 3: ADVANCED DETECTION
     // ═══════════════════════════════════════════════════════════════════
     println!("┌─────────────────────────────────────────────────────────────┐");
     println!("│ PHASE 3: Advanced Tampering Detection                      │");
     println!("└─────────────────────────────────────────────────────────────┘");
-    
+
     let start = Instant::now();
-    
+
     // Splicing Detection
     print!("  Running splicing detection...");
     let splicing_config = SplicingConfig {
@@ -150,9 +173,11 @@ fn main() -> Result<()> {
     };
     let splicing_detector = SplicingDetector::with_config(splicing_config);
     let splicing_result = splicing_detector.detect(&image)?;
-    splicing_result.visualization.save(format!("{}/analysis/splicing_detection.png", output_dir))?;
+    splicing_result
+        .visualization
+        .save(format!("{}/analysis/splicing_detection.png", output_dir))?;
     println!(" ✓ ({} regions)", splicing_result.manipulations.len());
-    
+
     // Comprehensive Tampering Detection
     print!("  Running comprehensive tampering detection...");
     let tampering_config = TamperingConfig {
@@ -165,26 +190,28 @@ fn main() -> Result<()> {
     };
     let tampering_detector = TamperingDetector::with_config(tampering_config);
     let tampering_result = tampering_detector.detect(&image)?;
-    tampering_result.visualization.save(format!("{}/analysis/tampering_detection.png", output_dir))?;
+    tampering_result
+        .visualization
+        .save(format!("{}/analysis/tampering_detection.png", output_dir))?;
     println!(" ✓ ({} detections)", tampering_result.manipulations.len());
-    
+
     println!("  ⏱ Time: {:?}", start.elapsed());
     println!();
-    
+
     // Print detection summary
     print_detection_summary(&splicing_result, &tampering_result);
-    
+
     // ═══════════════════════════════════════════════════════════════════
     // PHASE 4: VISUALIZATION
     // ═══════════════════════════════════════════════════════════════════
     println!("┌─────────────────────────────────────────────────────────────┐");
     println!("│ PHASE 4: Visualization Generation                          │");
     println!("└─────────────────────────────────────────────────────────────┘");
-    
+
     let start = Instant::now();
-    
+
     let rgb_image = image.to_rgb8();
-    
+
     // Create visualizer with custom config
     let vis_config = VisualizationConfig {
         color_scheme: ColorScheme::HeatMap,
@@ -195,19 +222,19 @@ fn main() -> Result<()> {
         show_legend: true,
     };
     let visualizer = Visualizer::with_config(vis_config);
-    
+
     // Generate comprehensive visualization
     print!("  Generating comprehensive visualization...");
     let comprehensive_vis = visualizer.visulaize_full_analysis(&rgb_image, &full_report);
     comprehensive_vis.save_all(&format!("{}/visualizations", output_dir))?;
     println!(" ✓");
-    
+
     // Generate analysis grid
     print!("  Generating analysis grid...");
     let grid = visualizer.create_analysis_grid(&rgb_image, &full_report);
     grid.save(format!("{}/visualizations/analysis_grid.png", output_dir))?;
     println!(" ✓");
-    
+
     // Generate comparison view
     print!("  Generating comparison view...");
     let comparison = visualizer.create_comparison(&[
@@ -217,34 +244,34 @@ fn main() -> Result<()> {
     ]);
     comparison.save(format!("{}/visualizations/comparison.png", output_dir))?;
     println!(" ✓");
-    
+
     // Generate report image
     print!("  Generating report image...");
     let report_image = comprehensive_vis.create_report_image();
     report_image.save(format!("{}/report_overview.png", output_dir))?;
     println!(" ✓");
-    
+
     println!("  ⏱ Time: {:?}", start.elapsed());
     println!();
-    
+
     // ═══════════════════════════════════════════════════════════════════
     // PHASE 5: REPORT GENERATION
     // ═══════════════════════════════════════════════════════════════════
     println!("┌─────────────────────────────────────────────────────────────┐");
     println!("│ PHASE 5: Report Generation                                 │");
     println!("└─────────────────────────────────────────────────────────────┘");
-    
+
     let start = Instant::now();
-    
+
     // Generate JSON report
     print!("  Generating JSON report...");
     let json_report = JsonReport::from(&full_report);
-    let json_str = json_report.to_json().map_err(|e| {
-        image_forensics::error::ForensicsError::AnalysisFailed(e.to_string())
-    })?;
+    let json_str = json_report
+        .to_json()
+        .map_err(|e| image_forensics::error::ForensicsError::AnalysisFailed(e.to_string()))?;
     fs::write(format!("{}/report.json", output_dir), &json_str)?;
     println!(" ✓");
-    
+
     // Generate detailed JSON with all detections
     print!("  Generating detailed detection report...");
     let detailed_report = generate_detailed_report(
@@ -253,38 +280,37 @@ fn main() -> Result<()> {
         &splicing_result,
         &tampering_result,
     );
-    fs::write(format!("{}/detailed_report.json", output_dir), detailed_report)?;
+    fs::write(
+        format!("{}/detailed_report.json", output_dir),
+        detailed_report,
+    )?;
     println!(" ✓");
-    
+
     // Generate HTML report
     print!("  Generating HTML report...");
-    let html_report = generate_html_report(
-        image_path,
-        &full_report,
-        &tampering_result,
-        output_dir,
-    );
+    let html_report = generate_html_report(image_path, &full_report, &tampering_result, output_dir);
     fs::write(format!("{}/report.html", output_dir), html_report)?;
     println!(" ✓");
-    
+
     // Generate text summary
     print!("  Generating text summary...");
-    let text_summary = generate_text_summary(
-        image_path,
-        &full_report,
-        &tampering_result,
-    );
+    let text_summary = generate_text_summary(image_path, &full_report, &tampering_result);
     fs::write(format!("{}/summary.txt", output_dir), text_summary)?;
     println!(" ✓");
-    
+
     println!("  ⏱ Time: {:?}", start.elapsed());
     println!();
-    
+
     // ═══════════════════════════════════════════════════════════════════
     // FINAL SUMMARY
     // ═══════════════════════════════════════════════════════════════════
-    print_final_summary(&full_report, &tampering_result, output_dir, total_start.elapsed());
-    
+    print_final_summary(
+        &full_report,
+        &tampering_result,
+        output_dir,
+        total_start.elapsed(),
+    );
+
     Ok(())
 }
 
@@ -327,22 +353,56 @@ fn print_analysis_summary(report: &FullAnalysisReport) {
     println!("  │ Core Analysis Results                                   │");
     println!("  ├─────────────────────────────────────────────────────────┤");
     println!("  │ ELA Analysis:                                           │");
-    println!("  │   Max Difference:      {:>8.2}                         │", report.ela.max_difference);
-    println!("  │   Mean Difference:     {:>8.2}                         │", report.ela.mean_difference);
-    println!("  │   Suspicious Regions:  {:>8}                         │", report.ela.suspicious_regions.len());
+    println!(
+        "  │   Max Difference:      {:>8.2}                         │",
+        report.ela.max_difference
+    );
+    println!(
+        "  │   Mean Difference:     {:>8.2}                         │",
+        report.ela.mean_difference
+    );
+    println!(
+        "  │   Suspicious Regions:  {:>8}                         │",
+        report.ela.suspicious_regions.len()
+    );
     println!("  ├─────────────────────────────────────────────────────────┤");
     println!("  │ Copy-Move Detection:                                    │");
-    println!("  │   Matches Found:       {:>8}                         │", report.copy_move.matches.len());
-    println!("  │   Confidence:          {:>7.1}%                         │", report.copy_move.confidence * 100.0);
+    println!(
+        "  │   Matches Found:       {:>8}                         │",
+        report.copy_move.matches.len()
+    );
+    println!(
+        "  │   Confidence:          {:>7.1}%                         │",
+        report.copy_move.confidence * 100.0
+    );
     println!("  ├─────────────────────────────────────────────────────────┤");
     println!("  │ Noise Analysis:                                         │");
-    println!("  │   Noise Level:         {:>8.2}                         │", report.noise.estimated_noise_level);
-    println!("  │   Inconsistency:       {:>7.1}%                         │", report.noise.inconsistency_score * 100.0);
+    println!(
+        "  │   Noise Level:         {:>8.2}                         │",
+        report.noise.estimated_noise_level
+    );
+    println!(
+        "  │   Inconsistency:       {:>7.1}%                         │",
+        report.noise.inconsistency_score * 100.0
+    );
     println!("  ├─────────────────────────────────────────────────────────┤");
     println!("  │ JPEG Analysis:                                          │");
-    println!("  │   Quality Estimate:    {:>8}                         │", report.jpeg.quality_estimate);
-    println!("  │   Ghost Detected:      {:>8}                         │", if report.jpeg.ghost_detected { "Yes" } else { "No" });
-    println!("  │   Double Compression:  {:>7.1}%                         │", report.jpeg.double_compression_likelihood * 100.0);
+    println!(
+        "  │   Quality Estimate:    {:>8}                         │",
+        report.jpeg.quality_estimate
+    );
+    println!(
+        "  │   Ghost Detected:      {:>8}                         │",
+        if report.jpeg.ghost_detected {
+            "Yes"
+        } else {
+            "No"
+        }
+    );
+    println!(
+        "  │   Double Compression:  {:>7.1}%                         │",
+        report.jpeg.double_compression_likelihood * 100.0
+    );
     println!("  └─────────────────────────────────────────────────────────┘");
     println!();
 }
@@ -352,26 +412,49 @@ fn print_detection_summary(splicing: &DetectionResult, tampering: &DetectionResu
     println!("  │ Detection Results                                       │");
     println!("  ├─────────────────────────────────────────────────────────┤");
     println!("  │ Splicing Detection:                                     │");
-    println!("  │   Regions Detected:    {:>8}                         │", splicing.manipulations.len());
-    println!("  │   Overall Score:       {:>7.1}%                         │", splicing.overall_score * 100.0);
-    println!("  │   Is Manipulated:      {:>8}                         │", if splicing.is_manipulated { "Yes" } else { "No" });
+    println!(
+        "  │   Regions Detected:    {:>8}                         │",
+        splicing.manipulations.len()
+    );
+    println!(
+        "  │   Overall Score:       {:>7.1}%                         │",
+        splicing.overall_score * 100.0
+    );
+    println!(
+        "  │   Is Manipulated:      {:>8}                         │",
+        if splicing.is_manipulated { "Yes" } else { "No" }
+    );
     println!("  ├─────────────────────────────────────────────────────────┤");
     println!("  │ Tampering Detection:                                    │");
-    println!("  │   Total Detections:    {:>8}                         │", tampering.manipulations.len());
-    println!("  │   Overall Score:       {:>7.1}%                         │", tampering.overall_score * 100.0);
-    println!("  │   Is Manipulated:      {:>8}                         │", if tampering.is_manipulated { "Yes" } else { "No" });
+    println!(
+        "  │   Total Detections:    {:>8}                         │",
+        tampering.manipulations.len()
+    );
+    println!(
+        "  │   Overall Score:       {:>7.1}%                         │",
+        tampering.overall_score * 100.0
+    );
+    println!(
+        "  │   Is Manipulated:      {:>8}                         │",
+        if tampering.is_manipulated {
+            "Yes"
+        } else {
+            "No"
+        }
+    );
     println!("  └─────────────────────────────────────────────────────────┘");
-    
+
     if !tampering.manipulations.is_empty() {
         println!();
         println!("  Detected Manipulations:");
-        
-        let mut by_type: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
+
+        let mut by_type: std::collections::HashMap<String, usize> =
+            std::collections::HashMap::new();
         for m in &tampering.manipulations {
             let type_name = format!("{:?}", m.manipulation_type);
             *by_type.entry(type_name).or_insert(0) += 1;
         }
-        
+
         for (type_name, count) in by_type {
             println!("    • {}: {} instance(s)", type_name, count);
         }
@@ -446,7 +529,7 @@ fn generate_detailed_report(
             })
         }),
     });
-    
+
     serde_json::to_string_pretty(&report).unwrap_or_default()
 }
 
@@ -463,9 +546,13 @@ fn generate_html_report(
     } else {
         "low"
     };
-    
-    let manipulations_html: String = tampering.manipulations.iter().map(|m| {
-        format!(r#"
+
+    let manipulations_html: String = tampering
+        .manipulations
+        .iter()
+        .map(|m| {
+            format!(
+                r#"
         <div class="manipulation">
             <h4>{:?}</h4>
             <p><strong>Region:</strong> ({}, {}) - {}x{}</p>
@@ -477,15 +564,25 @@ fn generate_html_report(
             </ul>
         </div>
         "#,
-            m.manipulation_type,
-            m.region.x, m.region.y, m.region.width, m.region.height,
-            m.confidence * 100.0, m.confidence_level,
-            m.description,
-            m.evidence.iter().map(|e| format!("<li>{}</li>", e)).collect::<Vec<_>>().join("")
-        )
-    }).collect();
+                m.manipulation_type,
+                m.region.x,
+                m.region.y,
+                m.region.width,
+                m.region.height,
+                m.confidence * 100.0,
+                m.confidence_level,
+                m.description,
+                m.evidence
+                    .iter()
+                    .map(|e| format!("<li>{}</li>", e))
+                    .collect::<Vec<_>>()
+                    .join("")
+            )
+        })
+        .collect();
 
-    format!(r#"<!DOCTYPE html>
+    format!(
+        r#"<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -626,8 +723,16 @@ fn generate_html_report(
         } else {
             "No significant signs of manipulation detected"
         },
-        if tampering.is_manipulated { "detected" } else { "clean" },
-        if tampering.is_manipulated { "Manipulation Detected" } else { "Appears Authentic" },
+        if tampering.is_manipulated {
+            "detected"
+        } else {
+            "clean"
+        },
+        if tampering.is_manipulated {
+            "Manipulation Detected"
+        } else {
+            "Appears Authentic"
+        },
         full_report.ela.max_difference,
         full_report.ela.mean_difference,
         full_report.ela.std_deviation,
@@ -638,7 +743,11 @@ fn generate_html_report(
         full_report.noise.inconsistency_score * 100.0,
         full_report.noise.anomalous_regions.len(),
         full_report.jpeg.quality_estimate,
-        if full_report.jpeg.ghost_detected { "Yes" } else { "No" },
+        if full_report.jpeg.ghost_detected {
+            "Yes"
+        } else {
+            "No"
+        },
         full_report.jpeg.double_compression_likelihood * 100.0,
         if tampering.manipulations.is_empty() {
             "<p style='color: #2ed573; padding: 20px;'>No manipulations detected.</p>".to_string()
@@ -656,56 +765,98 @@ fn generate_text_summary(
     tampering: &DetectionResult,
 ) -> String {
     let mut summary = String::new();
-    
+
     summary.push_str("═══════════════════════════════════════════════════════════════\n");
     summary.push_str("                    IMAGE FORENSICS REPORT                      \n");
     summary.push_str("═══════════════════════════════════════════════════════════════\n\n");
-    
+
     summary.push_str(&format!("Image: {}\n", image_path));
     summary.push_str(&format!("Analysis Date: {}\n\n", chrono_lite_timestamp()));
-    
+
     summary.push_str("───────────────────────────────────────────────────────────────\n");
     summary.push_str("                         VERDICT                               \n");
     summary.push_str("───────────────────────────────────────────────────────────────\n\n");
-    
-    summary.push_str(&format!("Tampering Probability: {:.1}%\n", full_report.tampering_ability * 100.0));
-    summary.push_str(&format!("Status: {}\n\n", if tampering.is_manipulated { 
-        "⚠️  MANIPULATION DETECTED" 
-    } else { 
-        "✅ APPEARS AUTHENTIC" 
-    }));
-    
+
+    summary.push_str(&format!(
+        "Tampering Probability: {:.1}%\n",
+        full_report.tampering_ability * 100.0
+    ));
+    summary.push_str(&format!(
+        "Status: {}\n\n",
+        if tampering.is_manipulated {
+            "⚠️  MANIPULATION DETECTED"
+        } else {
+            "✅ APPEARS AUTHENTIC"
+        }
+    ));
+
     summary.push_str("───────────────────────────────────────────────────────────────\n");
     summary.push_str("                    ANALYSIS DETAILS                           \n");
     summary.push_str("───────────────────────────────────────────────────────────────\n\n");
-    
+
     summary.push_str("ERROR LEVEL ANALYSIS:\n");
-    summary.push_str(&format!("  • Max Difference:      {:.2}\n", full_report.ela.max_difference));
-    summary.push_str(&format!("  • Mean Difference:     {:.2}\n", full_report.ela.mean_difference));
-    summary.push_str(&format!("  • Suspicious Regions:  {}\n\n", full_report.ela.suspicious_regions.len()));
-    
+    summary.push_str(&format!(
+        "  • Max Difference:      {:.2}\n",
+        full_report.ela.max_difference
+    ));
+    summary.push_str(&format!(
+        "  • Mean Difference:     {:.2}\n",
+        full_report.ela.mean_difference
+    ));
+    summary.push_str(&format!(
+        "  • Suspicious Regions:  {}\n\n",
+        full_report.ela.suspicious_regions.len()
+    ));
+
     summary.push_str("COPY-MOVE DETECTION:\n");
-    summary.push_str(&format!("  • Matches Found:       {}\n", full_report.copy_move.matches.len()));
-    summary.push_str(&format!("  • Confidence:          {:.1}%\n\n", full_report.copy_move.confidence * 100.0));
-    
+    summary.push_str(&format!(
+        "  • Matches Found:       {}\n",
+        full_report.copy_move.matches.len()
+    ));
+    summary.push_str(&format!(
+        "  • Confidence:          {:.1}%\n\n",
+        full_report.copy_move.confidence * 100.0
+    ));
+
     summary.push_str("NOISE ANALYSIS:\n");
-    summary.push_str(&format!("  • Noise Level:         {:.2}\n", full_report.noise.estimated_noise_level));
-    summary.push_str(&format!("  • Inconsistency:       {:.1}%\n\n", full_report.noise.inconsistency_score * 100.0));
-    
+    summary.push_str(&format!(
+        "  • Noise Level:         {:.2}\n",
+        full_report.noise.estimated_noise_level
+    ));
+    summary.push_str(&format!(
+        "  • Inconsistency:       {:.1}%\n\n",
+        full_report.noise.inconsistency_score * 100.0
+    ));
+
     summary.push_str("JPEG ANALYSIS:\n");
-    summary.push_str(&format!("  • Quality Estimate:    {}\n", full_report.jpeg.quality_estimate));
-    summary.push_str(&format!("  • Ghost Detected:      {}\n", if full_report.jpeg.ghost_detected { "Yes" } else { "No" }));
-    summary.push_str(&format!("  • Double Compression:  {:.1}%\n\n", full_report.jpeg.double_compression_likelihood * 100.0));
-    
+    summary.push_str(&format!(
+        "  • Quality Estimate:    {}\n",
+        full_report.jpeg.quality_estimate
+    ));
+    summary.push_str(&format!(
+        "  • Ghost Detected:      {}\n",
+        if full_report.jpeg.ghost_detected {
+            "Yes"
+        } else {
+            "No"
+        }
+    ));
+    summary.push_str(&format!(
+        "  • Double Compression:  {:.1}%\n\n",
+        full_report.jpeg.double_compression_likelihood * 100.0
+    ));
+
     if !tampering.manipulations.is_empty() {
         summary.push_str("───────────────────────────────────────────────────────────────\n");
         summary.push_str("                  DETECTED MANIPULATIONS                       \n");
         summary.push_str("───────────────────────────────────────────────────────────────\n\n");
-        
+
         for (i, m) in tampering.manipulations.iter().enumerate() {
             summary.push_str(&format!("{}. {:?}\n", i + 1, m.manipulation_type));
-            summary.push_str(&format!("   Region: ({}, {}) - {}x{}\n", 
-                m.region.x, m.region.y, m.region.width, m.region.height));
+            summary.push_str(&format!(
+                "   Region: ({}, {}) - {}x{}\n",
+                m.region.x, m.region.y, m.region.width, m.region.height
+            ));
             summary.push_str(&format!("   Confidence: {:.1}%\n", m.confidence * 100.0));
             summary.push_str(&format!("   {}\n", m.description));
             if !m.evidence.is_empty() {
@@ -717,16 +868,16 @@ fn generate_text_summary(
             summary.push_str("\n");
         }
     }
-    
+
     summary.push_str("═══════════════════════════════════════════════════════════════\n");
     summary.push_str("                    END OF REPORT                              \n");
     summary.push_str("═══════════════════════════════════════════════════════════════\n");
-    
+
     summary
 }
 
 fn print_final_summary(
-    full_report: &FullAnalysisReport, 
+    full_report: &FullAnalysisReport,
     tampering: &DetectionResult,
     output_dir: &str,
     elapsed: std::time::Duration,
@@ -735,7 +886,7 @@ fn print_final_summary(
     println!("║                    ANALYSIS COMPLETE                         ║");
     println!("╚══════════════════════════════════════════════════════════════╝");
     println!();
-    
+
     // Verdict
     let verdict_symbol = if full_report.tampering_ability > 0.7 {
         "🔴"
@@ -744,29 +895,54 @@ fn print_final_summary(
     } else {
         "🟢"
     };
-    
-    println!("  {} TAMPERING PROBABILITY: {:.1}%", verdict_symbol, full_report.tampering_ability * 100.0);
+
+    println!(
+        "  {} TAMPERING PROBABILITY: {:.1}%",
+        verdict_symbol,
+        full_report.tampering_ability * 100.0
+    );
     println!();
-    
+
     if tampering.is_manipulated {
         println!("  ⚠️  This image shows signs of manipulation!");
-        println!("  📊 {} manipulation(s) detected", tampering.manipulations.len());
+        println!(
+            "  📊 {} manipulation(s) detected",
+            tampering.manipulations.len()
+        );
     } else {
         println!("  ✅ No significant signs of manipulation detected.");
         println!("  📊 Image appears to be authentic");
     }
-    
+
     println!();
     println!("  ⏱️  Total analysis time: {:?}", elapsed);
     println!();
     println!("  📁 Output files:");
-    println!("     • {}/report.html          - Interactive HTML report", output_dir);
-    println!("     • {}/report.json          - JSON report data", output_dir);
-    println!("     • {}/detailed_report.json - Detailed analysis data", output_dir);
+    println!(
+        "     • {}/report.html          - Interactive HTML report",
+        output_dir
+    );
+    println!(
+        "     • {}/report.json          - JSON report data",
+        output_dir
+    );
+    println!(
+        "     • {}/detailed_report.json - Detailed analysis data",
+        output_dir
+    );
     println!("     • {}/summary.txt          - Text summary", output_dir);
-    println!("     • {}/report_overview.png  - Visual report overview", output_dir);
-    println!("     • {}/visualizations/      - All visualization images", output_dir);
-    println!("     • {}/analysis/            - Individual analysis outputs", output_dir);
+    println!(
+        "     • {}/report_overview.png  - Visual report overview",
+        output_dir
+    );
+    println!(
+        "     • {}/visualizations/      - All visualization images",
+        output_dir
+    );
+    println!(
+        "     • {}/analysis/            - Individual analysis outputs",
+        output_dir
+    );
     println!();
     println!("══════════════════════════════════════════════════════════════");
 }
@@ -774,11 +950,11 @@ fn print_final_summary(
 // Simple timestamp function (avoids chrono dependency)
 fn chrono_lite_timestamp() -> String {
     use std::time::{SystemTime, UNIX_EPOCH};
-    
+
     let duration = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap_or_default();
-    
+
     let secs = duration.as_secs();
     let days = secs / 86400;
     let years = 1970 + days / 365;
@@ -788,7 +964,9 @@ fn chrono_lite_timestamp() -> String {
     let hours = (secs % 86400) / 3600;
     let minutes = (secs % 3600) / 60;
     let seconds = secs % 60;
-    
-    format!("{:04}-{:02}-{:02} {:02}:{:02}:{:02}", 
-            years, months, day, hours, minutes, seconds)
+
+    format!(
+        "{:04}-{:02}-{:02} {:02}:{:02}:{:02}",
+        years, months, day, hours, minutes, seconds
+    )
 }
