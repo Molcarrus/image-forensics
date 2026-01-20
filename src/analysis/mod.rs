@@ -6,3 +6,4 @@ pub mod luminance_gradient;
 pub mod dct_analysis;
 pub mod prnu_analysis;
 pub mod shadow_analysis;
+pub mod pca_analysis;
