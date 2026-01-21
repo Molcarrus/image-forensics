@@ -7,3 +7,4 @@ pub mod noise;
 pub mod pca_analysis;
 pub mod prnu_analysis;
 pub mod shadow_analysis;
+pub mod chromatic_aberration;
