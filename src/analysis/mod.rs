@@ -1,3 +1,5 @@
+pub mod cfa_analysis;
+pub mod chromatic_aberration;
 pub mod copy_move;
 pub mod dct_analysis;
 pub mod ela;
@@ -7,4 +9,3 @@ pub mod noise;
 pub mod pca_analysis;
 pub mod prnu_analysis;
 pub mod shadow_analysis;
-pub mod chromatic_aberration;
