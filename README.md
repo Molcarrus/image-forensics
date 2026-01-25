@@ -1,6 +1,6 @@
 # Image Forensics
 
-A Rust library for performing digital image forensics. This crate provides a collection of tools and algorithms to detect manipulations, forgeries, and inconsistencies in images, such as tampering, splicing, copy-move forgeries, and more. It leverages various techniques from computer vision and signal processing to analyze image artifacts, metadata, and statistical properties.
+A Rust library for performing digital image forensics. This crate provides a collection of tools and algorithms to detect manipulations, forgeries, and inconsistencies in images, such as tampering, splicing, copy-move forgeries, and more.
 
 ## Features
 
@@ -23,8 +23,6 @@ The library includes the following modules:
 | **Splicing Detection** | Identifies composited elements from different sources. |
 | **Tampering Detection** | General-purpose detection of image alterations. |
 | **Metadata Analysis** | Extracts and analyzes EXIF and other metadata for tampering clues. |
-| **Report Generation** | Tools for visualizing results and generating forensic reports. |
-| **Image Utilities** | Helper functions for image loading, processing, and manipulation. |
 
 ## Installation
 
@@ -89,7 +87,6 @@ fn main() -> Result<()> {
 }
 ```
 
-Output: 
 ![](sample_output/copy_move_result.png)
 
 ## Dependencies
