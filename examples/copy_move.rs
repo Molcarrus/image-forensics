@@ -9,7 +9,7 @@ fn main() -> Result<()> {
 
     copy_move_result
         .visualization
-        .save("output/copy_move_result.png")?;
+        .save("sample_output/copy_move_result.png")?;
 
     println!("Matching regions found: {}", copy_move_result.matches.len());
     println!("Confidence: {:.1}%", copy_move_result.confidence * 100.0);
