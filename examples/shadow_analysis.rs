@@ -1,7 +1,7 @@
 use image_forensics::{analysis::shadow_analysis::ShadowAnalyzer, error::Result};
 
 fn main() -> Result<()> {
-    let image = image::open("evidences/shadow.jpg")?;
+    let image = image::open("evidences/shadow.png")?;
 
     let shadow_analyzer = ShadowAnalyzer::new();
     let shadow_result = shadow_analyzer.analyze(&image)?;

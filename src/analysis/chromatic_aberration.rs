@@ -319,7 +319,7 @@ impl ChromaticAberrationAnalyzer {
             let shifted_y = y as f64 + shift_y;
 
             if shifted_x >= 0.0
-                && shifted_y < (width - 1) as f64
+                && shifted_x < (width - 1) as f64
                 && shifted_y >= 0.0
                 && shifted_y < (height - 1) as f64
             {
@@ -469,14 +469,13 @@ impl ChromaticAberrationAnalyzer {
             return 0.0;
         }
 
+        let mean_rg_x =
+            measurements.iter().map(|m| m.rg_shift_x).sum::<f64>() / measurements.len() as f64;
+        let mean_rg_y =
+            measurements.iter().map(|m| m.rg_shift_y).sum::<f64>() / measurements.len() as f64;
+
         let mut ss_res = 0.0;
         let mut ss_tot = 0.0;
-
-        let mean_rg = measurements
-            .iter()
-            .map(|m| (m.rg_shift_x.powi(2) + m.rg_shift_y.powi(2)).sqrt())
-            .sum::<f64>()
-            / measurements.len() as f64;
 
         for m in measurements {
             let dx = m.x as f64 - center_x;
@@ -493,12 +492,9 @@ impl ChromaticAberrationAnalyzer {
             let expected_rg_x = k_red * r * radial_dir_x;
             let expected_rg_y = k_red * r * radial_dir_y;
 
-            let res_x = m.rg_shift_x - expected_rg_x;
-            let res_y = m.rg_shift_y - expected_rg_y;
-            ss_res += res_x * res_x + res_y * res_y;
-
-            let actual_mag = (m.rg_shift_x.powi(2) + m.rg_shift_y.powi(2)).sqrt();
-            ss_tot += (actual_mag - mean_rg).powi(2);
+            ss_res +=
+                (m.rg_shift_x - expected_rg_x).powi(2) + (m.rg_shift_y - expected_rg_y).powi(2);
+            ss_tot += (m.rg_shift_x - mean_rg_x).powi(2) + (m.rg_shift_y - mean_rg_y).powi(2);
         }
 
         if ss_tot < 1e-10 {
