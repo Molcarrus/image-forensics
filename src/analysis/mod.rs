@@ -9,4 +9,5 @@ pub mod luminance_gradient;
 pub mod noise;
 pub mod pca_analysis;
 pub mod prnu_analysis;
+pub mod resampling_detection;
 pub mod shadow_analysis;
