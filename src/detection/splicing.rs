@@ -136,7 +136,7 @@ impl SplicingDetector {
             }
         }
 
-        diff_sum / 2.0 // Normalize to 0-1
+        diff_sum / 2.0
     }
 
     fn detect_edge_inconsistencies(&self, image: &RgbImage) -> (GrayImage, Vec<SRegion>) {
@@ -190,6 +190,8 @@ impl SplicingDetector {
         let (width, height) = edge_map.dimensions();
         let mut regions = Vec::new();
         let block_size = self.config.block_size;
+        
+        let edge_threshold = 0.9 - (0.4 * self.config.edge_sensitivity);
 
         for by in (0..height).step_by(block_size as usize) {
             for bx in (0..width).step_by(block_size as usize) {
@@ -199,7 +201,7 @@ impl SplicingDetector {
                 let (horizontal_score, vertical_score) =
                     self.analyze_edge_regularity(edge_map, bx, by, block_w, block_h);
 
-                if horizontal_score > 0.7 || vertical_score > 0.7 {
+                if horizontal_score > edge_threshold || vertical_score > edge_threshold {
                     regions.push(SRegion {
                         x: bx,
                         y: by,
@@ -403,7 +405,7 @@ impl SplicingDetector {
         let mut vis = original.clone();
 
         for (region, score) in detections {
-            let intensity = (*score + 255.0) as u8;
+            let intensity = (*score * 255.0).min(255.0) as u8;
             let color = Rgb([intensity, (255 - intensity / 2), 0]);
 
             self.draw_rectangle(&mut vis, region, color, 2);
@@ -457,7 +459,7 @@ impl Detector for SplicingDetector {
         let mut result = DetectionResult::new(&rgb);
 
         let (_, color_regions) = self.analyze_color_consistency(&rgb);
-        let (_, edge_regions) = self.analyze_color_consistency(&rgb);
+        let (_, edge_regions) = self.detect_edge_inconsistencies(&rgb);
 
         let noise_analyzer = NoiseAnalyzer::new();
         let noise_result = noise_analyzer.analyze(image)?;
@@ -477,18 +479,18 @@ impl Detector for SplicingDetector {
                 .iter()
                 .any(|r| self.regions_overlap(r, region))
             {
-                evidence.push("Color histogram incosistency".into());
+                evidence.push("Color histogram inconsistency".into());
             }
 
             if edge_regions.iter().any(|r| self.regions_overlap(r, region)) {
-                evidence.push("Unnatrural edge patterns".into());
+                evidence.push("Unnatural edge patterns".into());
             }
 
             if noise_regions
                 .iter()
                 .any(|r| self.regions_overlap(r, region))
             {
-                evidence.push("Noide pattern mismatch".into());
+                evidence.push("Noise pattern mismatch".into());
             }
 
             if ela_regions.iter().any(|r| self.regions_overlap(r, region)) {
