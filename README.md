@@ -87,6 +87,8 @@ fn main() -> Result<()> {
 }
 ```
 
+#### Example Output
+
 ![](sample_output/copy_move_result.png)
 
 ## Dependencies
