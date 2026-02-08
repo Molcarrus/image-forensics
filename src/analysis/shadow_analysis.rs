@@ -77,8 +77,12 @@ impl ShadowAnalyzer {
 
         let (gradient_magnitude, gradient_direction) = self.calculate_gradients(&gray);
 
-        let shadow_regions =
-            self.analyze_shadow_regions(&shadow_mask, &gradient_magnitude, &gradient_direction);
+        let shadow_regions = self.analyze_shadow_regions(
+            &shadow_mask,
+            &gray,
+            &gradient_magnitude,
+            &gradient_direction,
+        );
 
         let (dominant_light_direction, dominant_direction_confidence) =
             self.find_dominant_direction(&shadow_regions);
@@ -122,7 +126,10 @@ impl ShadowAnalyzer {
         intensities.sort_unstable();
 
         let low_percentile = intensities[intensities.len() / 10];
-        let adaptive_threshold = self.config.shadow_threshold.min(low_percentile + 20);
+        let adaptive_threshold = self
+            .config
+            .shadow_threshold
+            .min(low_percentile.saturating_add(20));
 
         for y in 0..height {
             for x in 0..width {
@@ -327,6 +334,7 @@ impl ShadowAnalyzer {
     fn analyze_shadow_regions(
         &self,
         shadow_mask: &GrayImage,
+        gray: &GrayImage,
         gradient_magnitude: &GrayImage,
         gradient_direction: &GrayImage,
     ) -> Vec<ShadowRegion> {
@@ -336,11 +344,12 @@ impl ShadowAnalyzer {
 
         let mut visited = vec![vec![false; width as usize]; height as usize];
 
-        for y in (0..height).step_by(block_size as usize / 2) {
-            for x in (0..width).step_by(block_size as usize / 2) {
+        for y in 0..height {
+            for x in 0..width {
                 if shadow_mask.get_pixel(x, y)[0] > 0 && !visited[y as usize][x as usize] {
                     let region_info = self.analyze_single_shadow_region(
                         shadow_mask,
+                        gray,
                         gradient_magnitude,
                         gradient_direction,
                         x,
@@ -365,6 +374,7 @@ impl ShadowAnalyzer {
     fn analyze_single_shadow_region(
         &self,
         shadow_mask: &GrayImage,
+        gray: &GrayImage,
         gradient_magnitude: &GrayImage,
         gradient_direction: &GrayImage,
         start_x: u32,
@@ -416,7 +426,7 @@ impl ShadowAnalyzer {
                 }
             }
 
-            total_intensity += shadow_mask.get_pixel(x, y)[0] as f64;
+            total_intensity += gray.get_pixel(x, y)[0] as f64;
             pixel_count += 1;
 
             if x > 0 {
@@ -544,11 +554,20 @@ impl ShadowAnalyzer {
             return 1;
         }
 
-        let mut directions: Vec<f64> = regions
+        let mut directions = regions
             .iter()
             .filter(|r| r.direction_confidence > 0.3)
-            .map(|r| r.light_direction)
-            .collect();
+            .map(|r| {
+                let mut d = r.light_direction;
+                while d < 0.0 {
+                    d += 2.0 * PI;
+                }
+                while d >= 2.0 * PI {
+                    d -= 2.0 * PI;
+                }
+                d
+            })
+            .collect::<Vec<_>>();
 
         if directions.is_empty() {
             return 1;
@@ -632,10 +651,10 @@ impl ShadowAnalyzer {
 
             self.draw_arrow(
                 &mut vis,
-                center_x,
-                center_y,
-                end_x as u32,
-                end_y as u32,
+                center_x as i32,
+                center_y as i32,
+                end_x as i32,
+                end_y as i32,
                 color,
             );
         }
@@ -649,10 +668,10 @@ impl ShadowAnalyzer {
 
         self.draw_arrow(
             &mut vis,
-            indicator_x,
-            indicator_y,
-            end_x as u32,
-            end_y as u32,
+            indicator_x as i32,
+            indicator_y as i32,
+            end_x as i32,
+            end_y as i32,
             Rgb([255, 255, 0]),
         );
 
@@ -683,7 +702,7 @@ impl ShadowAnalyzer {
         }
     }
 
-    fn draw_arrow(&self, image: &mut RgbImage, x0: u32, y0: u32, x1: u32, y1: u32, color: Rgb<u8>) {
+    fn draw_arrow(&self, image: &mut RgbImage, x0: i32, y0: i32, x1: i32, y1: i32, color: Rgb<u8>) {
         self.draw_line(image, x0, y0, x1, y1, color);
 
         let (width, height) = image.dimensions();
@@ -697,12 +716,12 @@ impl ShadowAnalyzer {
             let hy = y1 as f64 + arrow_size * head_angle.sin();
 
             if hx >= 0.0 && hx < width as f64 && hy >= 0.0 && hy < height as f64 {
-                self.draw_line(image, x1, y1, hx as u32, hy as u32, color);
+                self.draw_line(image, x1, y1, hx as i32, hy as i32, color);
             }
         }
     }
 
-    fn draw_line(&self, image: &mut RgbImage, x0: u32, y0: u32, x1: u32, y1: u32, color: Rgb<u8>) {
+    fn draw_line(&self, image: &mut RgbImage, x0: i32, y0: i32, x1: i32, y1: i32, color: Rgb<u8>) {
         let (width, height) = image.dimensions();
 
         let dx = (x1 as i32 - x0 as i32).abs();
@@ -714,12 +733,20 @@ impl ShadowAnalyzer {
         let mut x = x0 as i32;
         let mut y = y0 as i32;
 
+        let max_steps = (dx.abs() + dy.abs() + 2) as usize;
+        let mut steps = 0;
+
         loop {
             if x >= 0 && x < width as i32 && y >= 0 && y < height as i32 {
                 image.put_pixel(x as u32, y as u32, color);
             }
 
             if x == x1 as i32 && y == y1 as i32 {
+                break;
+            }
+
+            steps += 1;
+            if steps > max_steps {
                 break;
             }
 

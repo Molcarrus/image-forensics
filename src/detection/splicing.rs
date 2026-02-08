@@ -190,7 +190,7 @@ impl SplicingDetector {
         let (width, height) = edge_map.dimensions();
         let mut regions = Vec::new();
         let block_size = self.config.block_size;
-        
+
         let edge_threshold = 0.9 - (0.4 * self.config.edge_sensitivity);
 
         for by in (0..height).step_by(block_size as usize) {
