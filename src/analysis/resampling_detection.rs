@@ -96,8 +96,8 @@ impl ResamplingDetector {
         let (width, height) = gray.dimensions();
         let mut p_map = GrayImage::new(width, height);
 
-        for y in 2..height - 2 {
-            for x in 2..width - 2 {
+        for y in 1..height - 1 {
+            for x in 1..width - 1 {
                 let d2x = gray.get_pixel(x - 1, y)[0] as f64 - 2.0 * gray.get_pixel(x, y)[0] as f64
                     + gray.get_pixel(x + 1, y)[0] as f64;
 
@@ -115,7 +115,7 @@ impl ResamplingDetector {
     }
 
     fn detect_periodic_patterns(&self, p_map: &GrayImage) -> Vec<PeriodicPattern> {
-        let (width, height) = p_map.dimensions();
+        let (_width, _height) = p_map.dimensions();
         let mut patterns = Vec::new();
 
         let h_autocorr = self.compute_autocorrelation(p_map, true);
@@ -209,7 +209,7 @@ impl ResamplingDetector {
     }
 
     fn find_period(&self, autocorr: &[f64]) -> Option<(f64, f64)> {
-        if autocorr.len() < 3 {
+        if autocorr.len() < 4 {
             return None;
         }
 
@@ -241,13 +241,9 @@ impl ResamplingDetector {
             .iter()
             .max_by(|a, b| a.strength.partial_cmp(&b.strength).unwrap())?;
 
-        if best_pattern.period >= self.config.min_factor
-            && best_pattern.period <= self.config.max_factor
-        {
-            Some(best_pattern.period)
-        } else {
-            None
-        }
+        let factor = best_pattern.period;
+
+        if factor >= 1.0 { Some(factor) } else { None }
     }
 
     fn create_probability_map(&self, p_map: &GrayImage) -> GrayImage {
@@ -255,14 +251,15 @@ impl ResamplingDetector {
         let block_size = self.config.block_size;
         let mut prob_map = GrayImage::new(width, height);
 
-        for by in (0..height - block_size).step_by(block_size as usize / 2) {
-            for bx in (0..width - block_size).step_by(block_size as usize / 2) {
+        for by in (0..height.saturating_sub(block_size)).step_by(block_size as usize / 2) {
+            for bx in (0..width.saturating_sub(block_size)).step_by(block_size as usize / 2) {
                 let local_prob = self.analyze_local_periodicity(p_map, bx, by, block_size);
                 let value = (local_prob * 255.0) as u8;
 
                 for y in by..(by + block_size).min(height) {
                     for x in bx..(bx + block_size).min(width) {
-                        prob_map.put_pixel(x, y, Luma([value]));
+                        let existing = prob_map.get_pixel(x, y)[0];
+                        prob_map.put_pixel(x, y, Luma([existing.max(value)]));
                     }
                 }
             }
@@ -274,21 +271,25 @@ impl ResamplingDetector {
     fn analyze_local_periodicity(&self, p_map: &GrayImage, bx: u32, by: u32, size: u32) -> f64 {
         let (width, height) = p_map.dimensions();
 
-        let mut values = Vec::new();
-        for y in by..(by + size).min(height) {
-            for x in bx..(bx + size).min(width) {
-                values.push(p_map.get_pixel(x, y)[0] as f64);
-            }
-        }
-
-        if values.is_empty() {
+        let mid_y = by + size / 2;
+        if mid_y >= height {
             return 0.0;
         }
 
-        let mean = values.iter().sum::<f64>() / values.len() as f64;
-        let variance = values.iter().map(|v| (v - mean).powi(2)).sum::<f64>() / values.len() as f64;
+        let line = (bx..(bx + size).min(width))
+            .map(|x| p_map.get_pixel(x, mid_y)[0] as f64)
+            .collect::<Vec<_>>();
 
-        (variance / 1000.0).min(1.0)
+        if line.len() < 4 {
+            return 0.0;
+        }
+
+        let max_lag = (line.len() / 2).min(self.config.window_size as usize);
+        let autocorr = self.line_autocorrelation(&line, max_lag);
+
+        let max_peak = autocorr.iter().skip(2).cloned().fold(0.0_f64, f64::max);
+
+        max_peak.max(0.0).min(1.0)
     }
 
     fn find_resampled_regions(&self, prob_map: &GrayImage) -> Vec<SRegion> {
