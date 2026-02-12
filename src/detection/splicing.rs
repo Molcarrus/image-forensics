@@ -25,7 +25,7 @@ impl Default for SplicingConfig {
             color_sensitivity: 0.5,
             noise_sensitivity: 0.5,
             edge_sensitivity: 0.5,
-            min_region_size: 100,
+            min_region_size: 1000,
             ela_quality: 95,
         }
     }
@@ -63,7 +63,7 @@ impl SplicingDetector {
                     self.calculate_color_histogram(image, bx, by, block_w, block_h);
 
                 let diff = self.histogram_difference(&global_histogram, &block_histogram);
-                let inconsistency = (diff * 255.0 * self.config.color_sensitivity) as u8;
+                let inconsistency = (diff * 255.0 * self.config.color_sensitivity).min(255.0) as u8;
 
                 for y in by..(by + block_h) {
                     for x in bx..(bx + block_w) {
@@ -144,6 +144,10 @@ impl SplicingDetector {
         let (width, height) = gray.dimensions();
         let mut edge_map = GrayImage::new(width, height);
         let mut suspicious_regions = Vec::new();
+
+        if width < 3 || height < 3 {
+            return (edge_map, suspicious_regions);
+        }
 
         for y in 1..height - 1 {
             for x in 1..width - 1 {
@@ -295,35 +299,58 @@ impl SplicingDetector {
         noise_regions: &[SRegion],
         ela_regions: &[SRegion],
     ) -> Vec<(SRegion, f64)> {
+        let mut all_regions = Vec::new();
+        all_regions.extend_from_slice(color_regions);
+        all_regions.extend_from_slice(edge_regions);
+        all_regions.extend_from_slice(noise_regions);
+        all_regions.extend_from_slice(ela_regions);
+
+        let mut seen = Vec::new();
         let mut combined = Vec::new();
 
-        for color_region in color_regions {
-            let mut score = 0.25;
-            let mut evidence_count = 1;
-
-            for edge_region in edge_regions {
-                if self.regions_overlap(color_region, edge_region) {
-                    score += 0.25;
-                    evidence_count += 1;
-                }
+        for region in &all_regions {
+            if seen.iter().any(|s: &SRegion| {
+                s.x == region.x
+                    && s.y == region.y
+                    && s.width == region.width
+                    && s.height == region.height
+            }) {
+                continue;
             }
 
-            for noise_region in noise_regions {
-                if self.regions_overlap(color_region, noise_region) {
-                    score += 0.25;
-                    evidence_count += 1;
-                }
+            seen.push(*region);
+
+            let mut score = 0.0;
+            let mut evidence_count = 0;
+
+            if color_regions
+                .iter()
+                .any(|r| self.regions_overlap(r, region))
+            {
+                score += 0.25;
+                evidence_count += 1;
             }
 
-            for ela_region in ela_regions {
-                if self.regions_overlap(color_region, ela_region) {
-                    score += 0.25;
-                    evidence_count += 1;
-                }
+            if edge_regions.iter().any(|r| self.regions_overlap(r, region)) {
+                score += 0.25;
+                evidence_count += 1;
+            }
+
+            if noise_regions
+                .iter()
+                .any(|r| self.regions_overlap(r, region))
+            {
+                score += 0.25;
+                evidence_count += 1;
+            }
+
+            if ela_regions.iter().any(|r| self.regions_overlap(r, region)) {
+                score += 0.25;
+                evidence_count += 1;
             }
 
             if evidence_count >= 2 {
-                combined.push((*color_region, score));
+                combined.push((*region, score));
             }
         }
 
@@ -350,6 +377,8 @@ impl SplicingDetector {
         let mut merged = Vec::new();
         let mut used = vec![false; detections.len()];
 
+        let max_merge_iterations = 10;
+
         for i in 0..detections.len() {
             if used[i] {
                 continue;
@@ -359,6 +388,7 @@ impl SplicingDetector {
             let mut max_score = detections[i].1;
             used[i] = true;
 
+            let mut iterations = 0;
             loop {
                 let mut found = false;
                 for j in 0..detections.len() {
@@ -374,7 +404,8 @@ impl SplicingDetector {
                     }
                 }
 
-                if !found {
+                iterations += 1;
+                if !found || iterations >= max_merge_iterations {
                     break;
                 }
             }
@@ -406,7 +437,7 @@ impl SplicingDetector {
 
         for (region, score) in detections {
             let intensity = (*score * 255.0).min(255.0) as u8;
-            let color = Rgb([intensity, (255 - intensity / 2), 0]);
+            let color = Rgb([intensity, (255u8.saturating_sub(intensity)), 0]);
 
             self.draw_rectangle(&mut vis, region, color, 2);
         }
@@ -423,30 +454,41 @@ impl SplicingDetector {
     ) {
         let (width, height) = image.dimensions();
 
+        let x_start = region.x.saturating_sub(thickness);
+        let x_end = region
+            .x
+            .saturating_add(region.width)
+            .saturating_add(thickness)
+            .min(width);
+        let y_start = region.y.saturating_sub(thickness);
+        let y_end = region
+            .y
+            .saturating_add(region.height)
+            .saturating_add(thickness)
+            .min(height);
+
         for t in 0..thickness {
-            for x in region.x.saturating_sub(t)..(region.x + region.width + t).min(width) {
-                if region.y >= t && region.y - t < height {
-                    image.put_pixel(x, region.y.saturating_sub(t), color);
+            let top_y = region.y.saturating_sub(t);
+            let bot_y = region.y.saturating_add(region.height).saturating_add(t);
+
+            for x in x_start..x_end {
+                if top_y < height {
+                    image.put_pixel(x, top_y, color);
+                }
+                if bot_y < height {
+                    image.put_pixel(x, bot_y, color);
                 }
             }
 
-            for x in region.x.saturating_sub(t)..(region.x + region.width + t).min(width) {
-                let y = region.y + region.height + t;
-                if y < height {
-                    image.put_pixel(x, y, color);
-                }
-            }
+            let left_x = region.x.saturating_sub(t);
+            let right_x = region.x.saturating_add(region.width).saturating_add(t);
 
-            for y in region.y.saturating_sub(t)..(region.y + region.height + t).min(height) {
-                if region.x >= t {
-                    image.put_pixel(region.x.saturating_sub(t), y, color);
+            for y in y_start..y_end {
+                if left_x < width {
+                    image.put_pixel(left_x, y, color);
                 }
-            }
-
-            for y in region.y.saturating_sub(t)..(region.y + region.height + t).min(height) {
-                let x = region.x + region.width + t;
-                if x < width {
-                    image.put_pixel(x, y, color);
+                if right_x < width {
+                    image.put_pixel(right_x, y, color);
                 }
             }
         }
@@ -456,6 +498,14 @@ impl SplicingDetector {
 impl Detector for SplicingDetector {
     fn detect(&self, image: &image::DynamicImage) -> Result<DetectionResult> {
         let rgb = image.to_rgb8();
+        let (width, height) = rgb.dimensions();
+
+        if width < self.config.block_size * 2 || height < self.config.block_size * 2 {
+            return Err(crate::error::ForensicsError::ImageTooSmall(
+                self.config.block_size * 2,
+            ));
+        }
+
         let mut result = DetectionResult::new(&rgb);
 
         let (_, color_regions) = self.analyze_color_consistency(&rgb);
