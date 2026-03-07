@@ -263,7 +263,7 @@ impl ChromaticAberrationAnalyzer {
         reference: &GrayImage,
         edge_points: &[(u32, u32, f64, f64)],
     ) -> (f64, f64, f64) {
-        let (width, height) = reference.dimensions();
+        // let (width, height) = reference.dimensions();
         let search_radius = self.config.max_aberration.ceil() as i32;
 
         let mut best_shift_x = 0.0;

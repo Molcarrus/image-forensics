@@ -383,7 +383,7 @@ impl CfaAnalyzer {
     fn determine_dominant_pattern(
         &self,
         stats: &CfaPatternStats,
-        measurements: &[CfaMeasurement],
+        _measurements: &[CfaMeasurement],
     ) -> (CfaPattern, f64) {
         let total = stats.rggb_count
             + stats.bggr_count
