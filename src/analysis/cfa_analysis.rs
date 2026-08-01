@@ -1,6 +1,11 @@
 use image::{DynamicImage, GrayImage, Luma, Rgb, RgbImage};
 
-use crate::{SRegion, error::Result};
+use crate::{
+    SRegion,
+    error::Result,
+    image_utils::{ensure_min_dimensions, full_blocks},
+    region::merge_regions,
+};
 
 #[derive(Debug, Clone)]
 pub struct CfaConfig {
@@ -81,11 +86,7 @@ impl CfaAnalyzer {
         let rgb = image.to_rgb8();
         let (width, height) = rgb.dimensions();
 
-        if width < self.config.block_size * 2 || height < self.config.block_size * 2 {
-            return Err(crate::error::ForensicsError::ImageTooSmall(
-                self.config.block_size * 2,
-            ));
-        }
+        ensure_min_dimensions(width, height, self.config.block_size * 2)?;
 
         let measurements = self.analyze_cfa_patterns(&rgb);
 
@@ -103,7 +104,7 @@ impl CfaAnalyzer {
 
         let consistency_score = self.calculate_consistency_score(&measurements, dominant_pattern);
 
-        let manipulation_probability = self.calculate_mainpulation_probability(
+        let manipulation_probability = self.calculate_manipulation_probability(
             &inconsistent_regions,
             consistency_score,
             &pattern_stats,
@@ -127,17 +128,10 @@ impl CfaAnalyzer {
     fn analyze_cfa_patterns(&self, rgb: &RgbImage) -> Vec<CfaMeasurement> {
         let (width, height) = rgb.dimensions();
         let block_size = self.config.block_size;
-        let mut measurements = Vec::new();
 
-        for by in (0..height - block_size).step_by(block_size as usize / 2) {
-            for bx in (0..width - block_size).step_by(block_size as usize / 2) {
-                if let Some(measurement) = self.analyze_block(rgb, bx, by, block_size) {
-                    measurements.push(measurement);
-                }
-            }
-        }
-
-        measurements
+        full_blocks(width, height, block_size, (block_size / 2).max(1))
+            .filter_map(|region| self.analyze_block(rgb, region.x, region.y, block_size))
+            .collect()
     }
 
     fn analyze_block(&self, rgb: &RgbImage, bx: u32, by: u32, size: u32) -> Option<CfaMeasurement> {
@@ -208,48 +202,31 @@ impl CfaAnalyzer {
                 let p01 = rgb.get_pixel(x, y + 1);
                 let p11 = rgb.get_pixel(x + 1, y + 1);
 
+                // RGGB
                 scores[0] += self.pattern_match_score(
-                    p00,
-                    p10,
-                    p01,
-                    p11,
-                    [2, 0, 0],
-                    [0, 1, 0],
-                    [0, 1, 0],
-                    [0, 0, 2],
+                    [p00, p10, p01, p11],
+                    [[2, 0, 0], [0, 1, 0], [0, 1, 0], [0, 0, 2]],
                 );
 
+                // BGGR
                 scores[1] += self.pattern_match_score(
-                    p00,
-                    p10,
-                    p01,
-                    p11,
-                    [0, 0, 2],
-                    [0, 1, 0],
-                    [0, 1, 0],
-                    [2, 0, 0],
+                    [p00, p10, p01, p11],
+                    [[0, 0, 2], [0, 1, 0], [0, 1, 0], [2, 0, 0]],
                 );
 
+                // GRBG. The blue site previously carried the weight
+                // `[0, 2, 0]`, which matches no arm of `pattern_match_score`
+                // and so scored a constant zero, biasing this pattern down on
+                // every block.
                 scores[2] += self.pattern_match_score(
-                    p00,
-                    p10,
-                    p01,
-                    p11,
-                    [0, 1, 0],
-                    [2, 0, 0],
-                    [0, 2, 0],
-                    [0, 1, 0],
+                    [p00, p10, p01, p11],
+                    [[0, 1, 0], [2, 0, 0], [0, 0, 2], [0, 1, 0]],
                 );
 
+                // GBRG
                 scores[3] += self.pattern_match_score(
-                    p00,
-                    p10,
-                    p01,
-                    p11,
-                    [0, 1, 0],
-                    [0, 0, 2],
-                    [2, 0, 0],
-                    [0, 1, 0],
+                    [p00, p10, p01, p11],
+                    [[0, 1, 0], [0, 0, 2], [2, 0, 0], [0, 1, 0]],
                 );
             }
         }
@@ -264,17 +241,11 @@ impl CfaAnalyzer {
         scores
     }
 
-    fn pattern_match_score(
-        &self,
-        p00: &Rgb<u8>,
-        p10: &Rgb<u8>,
-        p01: &Rgb<u8>,
-        p11: &Rgb<u8>,
-        w00: [u8; 3],
-        w10: [u8; 3],
-        w01: [u8; 3],
-        w11: [u8; 3],
-    ) -> f64 {
+    /// Score a 2x2 quad against one Bayer arrangement.
+    ///
+    /// `quad` is the sampled pixels in (00, 10, 01, 11) order and `weights` the
+    /// expected filter at each of those sites, same order.
+    fn pattern_match_score(&self, quad: [&Rgb<u8>; 4], weights: [[u8; 3]; 4]) -> f64 {
         let score = |pixel: &Rgb<u8>, weight: [u8; 3]| -> f64 {
             let r = pixel[0] as f64;
             let g = pixel[1] as f64;
@@ -288,7 +259,10 @@ impl CfaAnalyzer {
             }
         };
 
-        score(p00, w00) + score(p10, w10) + score(p01, w01) + score(p11, w11)
+        quad.iter()
+            .zip(weights.iter())
+            .map(|(&pixel, &weight)| score(pixel, weight))
+            .sum()
     }
 
     fn best_pattern(&self, scores: &[f64; 4]) -> (CfaPattern, f64) {
@@ -413,6 +387,10 @@ impl CfaAnalyzer {
         let (width, height) = rgb.dimensions();
         let mut map = GrayImage::new(width, height);
 
+        if width < 3 || height < 3 {
+            return map;
+        }
+
         for y in 1..height - 1 {
             for x in 1..width - 1 {
                 let artifact = self.detect_zipper_artifact(rgb, x, y);
@@ -472,71 +450,7 @@ impl CfaAnalyzer {
             })
             .collect::<Vec<_>>();
 
-        self.merge_regions(inconsistent)
-    }
-
-    fn merge_regions(&self, regions: Vec<SRegion>) -> Vec<SRegion> {
-        if regions.is_empty() {
-            return regions;
-        }
-
-        let mut merged = Vec::new();
-        let mut used = vec![false; regions.len()];
-
-        for i in 0..regions.len() {
-            if used[i] {
-                continue;
-            }
-
-            let mut current = regions[i];
-            used[i] = true;
-
-            loop {
-                let mut found = false;
-                for j in 0..regions.len() {
-                    if used[j] {
-                        continue;
-                    }
-
-                    if self.regions_adjacent(&current, &regions[j]) {
-                        current = self.merge_two_regions(&current, &regions[j]);
-                        used[j] = true;
-                        found = true;
-                    }
-                }
-
-                if !found {
-                    break;
-                }
-            }
-
-            merged.push(current);
-        }
-
-        merged
-    }
-
-    fn regions_adjacent(&self, a: &SRegion, b: &SRegion) -> bool {
-        let gap = self.config.block_size / 2;
-
-        !(a.x + a.width + gap < b.x
-            || b.x + b.width + gap < a.x
-            || a.y + a.height + gap < b.y
-            || b.y + b.height + gap < a.y)
-    }
-
-    fn merge_two_regions(&self, a: &SRegion, b: &SRegion) -> SRegion {
-        let x = a.x.min(b.x);
-        let y = a.y.min(b.y);
-        let x2 = (a.x + a.width).max(b.x + b.width);
-        let y2 = (a.y + a.height).max(b.y + b.height);
-
-        SRegion {
-            x,
-            y,
-            width: x2 - x,
-            height: y2 - y,
-        }
+        merge_regions(inconsistent, self.config.block_size / 2)
     }
 
     fn calculate_consistency_score(
@@ -556,7 +470,7 @@ impl CfaAnalyzer {
         matching as f64 / measurements.len() as f64
     }
 
-    fn calculate_mainpulation_probability(
+    fn calculate_manipulation_probability(
         &self,
         inconsistent_regions: &[SRegion],
         consistency_score: f64,
@@ -572,11 +486,6 @@ impl CfaAnalyzer {
             .sum::<u32>();
 
         let coverage = inconsistent_pixels as f64 / total_pixels;
-
-        let total_patterns = pattern_stats.rggb_count
-            + pattern_stats.bggr_count
-            + pattern_stats.grbg_count
-            + pattern_stats.gbrg_count;
 
         let non_zero_patterns = [
             pattern_stats.rggb_count,

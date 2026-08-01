@@ -1,6 +1,11 @@
 use image::{DynamicImage, GrayImage, Luma, RgbImage};
 
-use crate::{SRegion, error::Result, image_utils::rgb_to_gray};
+use crate::{
+    SRegion,
+    error::Result,
+    image_utils::{ensure_min_dimensions, rgb_to_gray},
+    region::merge_regions,
+};
 
 #[derive(Debug, Clone)]
 pub struct PrnuConfig {
@@ -60,11 +65,7 @@ impl PrnuAnalyzer {
         let rgb = image.to_rgb8();
         let (width, height) = rgb.dimensions();
 
-        if width < self.config.block_size * 2 || height < self.config.block_size * 2 {
-            return Err(crate::error::ForensicsError::ImageTooSmall(
-                self.config.block_size * 2,
-            ));
-        }
+        ensure_min_dimensions(width, height, self.config.block_size * 2)?;
 
         let prnu_pattern = self.extract_prnu(&rgb)?;
 
@@ -73,7 +74,7 @@ impl PrnuAnalyzer {
         let (correlation_map, block_correlations) = self.analyze_local_consistency(&prnu_pattern);
 
         let inconsistent_regions =
-            self.find_incosistent_regions(&correlation_map, &block_correlations);
+            self.find_inconsistent_regions(&correlation_map, &block_correlations);
 
         let consistency_score = self.calculate_consistency_score(&block_correlations);
 
@@ -111,13 +112,12 @@ impl PrnuAnalyzer {
             }
         }
 
-        let enhanced = self.weiner_filter(&prnu, &gray);
+        let enhanced = self.wiener_filter(&prnu, &gray);
 
         Ok(enhanced)
     }
 
     fn denoise_image(&self, gray: &GrayImage) -> GrayImage {
-        let (width, height) = gray.dimensions();
         let mut result = gray.clone();
 
         for _ in 0..self.config.wavelet_levels {
@@ -169,14 +169,16 @@ impl PrnuAnalyzer {
                 } else {
                     center
                 };
-                result.put_pixel(x, y, Luma([filtered.clamp(0.0, 250.0) as u8]));
+                // Clamped to 250 previously, which crushed the brightest 2% of
+                // the tonal range into a false plateau in the residual.
+                result.put_pixel(x, y, Luma([filtered.clamp(0.0, 255.0) as u8]));
             }
         }
 
         result
     }
 
-    fn weiner_filter(&self, noise: &GrayImage, original: &GrayImage) -> GrayImage {
+    fn wiener_filter(&self, noise: &GrayImage, original: &GrayImage) -> GrayImage {
         let (width, height) = noise.dimensions();
         let mut result = GrayImage::new(width, height);
 
@@ -184,7 +186,7 @@ impl PrnuAnalyzer {
 
         for y in 0..height {
             for x in 0..width {
-                let (local_mean, local_var) =
+                let (_local_mean, local_var) =
                     self.calculate_local_stats(original, x, y, block_size);
 
                 let noise_val = noise.get_pixel(x, y)[0] as f64 - 128.0;
@@ -193,7 +195,7 @@ impl PrnuAnalyzer {
                 let noise_var = self.config.denoise_sigma * self.config.denoise_sigma;
                 let signal_var = (local_var - noise_var).max(0.0);
 
-                let weiner_weight = if local_var > 0.0 {
+                let wiener_weight = if local_var > 0.0 {
                     signal_var / local_var
                 } else {
                     0.0
@@ -205,7 +207,7 @@ impl PrnuAnalyzer {
                     0.5
                 };
 
-                let filtered = noise_val * weiner_weight * intensity_weight;
+                let filtered = noise_val * wiener_weight * intensity_weight;
                 let normalized = (filtered + 128.0).clamp(0.0, 255.0) as u8;
 
                 result.put_pixel(x, y, Luma([normalized]));
@@ -360,14 +362,14 @@ impl PrnuAnalyzer {
         (correlation_map, block_correlations)
     }
 
-    fn find_incosistent_regions(
+    fn find_inconsistent_regions(
         &self,
         correlation_map: &GrayImage,
         correlations: &[f64],
     ) -> Vec<SRegion> {
         let (width, height) = correlation_map.dimensions();
         let block_size = self.config.block_size;
-        let blocks_x = (width + block_size - 1) / block_size;
+        let blocks_x = width.div_ceil(block_size);
 
         let mut regions = Vec::new();
 
@@ -399,71 +401,7 @@ impl PrnuAnalyzer {
             }
         }
 
-        self.merge_adjacent_regions(regions)
-    }
-
-    fn merge_adjacent_regions(&self, regions: Vec<SRegion>) -> Vec<SRegion> {
-        if regions.is_empty() {
-            return regions;
-        }
-
-        let mut merged = Vec::new();
-        let mut used = vec![false; regions.len()];
-
-        for i in 0..regions.len() {
-            if used[i] {
-                continue;
-            }
-
-            let mut current = regions[i];
-            used[i] = true;
-
-            loop {
-                let mut found = false;
-                for j in 0..regions.len() {
-                    if used[j] {
-                        continue;
-                    }
-
-                    if self.regions_adjacent(&current, &regions[j]) {
-                        current = self.merge_two_regions(&current, &regions[j]);
-                        used[j] = true;
-                        found = true;
-                    }
-                }
-
-                if !found {
-                    break;
-                }
-            }
-
-            merged.push(current);
-        }
-
-        merged
-    }
-
-    fn regions_adjacent(&self, a: &SRegion, b: &SRegion) -> bool {
-        let gap = self.config.block_size / 2;
-
-        !(a.x + a.width + gap < b.x
-            || b.x + b.width + gap < a.x
-            || a.y + a.height + gap < b.y
-            || b.y + b.height + gap < a.y)
-    }
-
-    fn merge_two_regions(&self, a: &SRegion, b: &SRegion) -> SRegion {
-        let x = a.x.min(b.x);
-        let y = a.y.min(b.y);
-        let x2 = (a.x + a.width).max(b.x + b.width);
-        let y2 = (a.y + a.height).max(b.y + b.height);
-
-        SRegion {
-            x,
-            y,
-            width: x2 - x,
-            height: y2 - y,
-        }
+        merge_regions(regions, self.config.block_size / 2)
     }
 
     fn calculate_consistency_score(&self, correlations: &[f64]) -> f64 {
@@ -490,7 +428,7 @@ impl PrnuAnalyzer {
 
         let low_ratio = low_count as f64 / valid_correlations.len() as f64;
 
-        (mean * (1.0 - low_ratio * 0.5)).max(0.0).min(1.0)
+        (mean * (1.0 - low_ratio * 0.5)).clamp(0.0, 1.0)
     }
 
     pub fn compare_patterns(&self, pattern1: &GrayImage, pattern2: &GrayImage) -> f64 {
@@ -504,8 +442,15 @@ impl PrnuAnalyzer {
         let mut sum2 = 0.0;
         let n = (width * height) as f64;
 
+        if n == 0.0 {
+            return 0.0;
+        }
+
         for y in 0..height {
-            for x in 0..height {
+            // Was `0..height`, so this indexed columns by row count: wrong for
+            // any non-square overlap and an out-of-bounds panic when the
+            // patterns were taller than they are wide.
+            for x in 0..width {
                 sum1 += pattern1.get_pixel(x, y)[0] as f64 - 128.0;
                 sum2 += pattern2.get_pixel(x, y)[0] as f64 - 128.0;
             }
@@ -532,7 +477,7 @@ impl PrnuAnalyzer {
         let denom = (denom1 * denom2).sqrt();
 
         if denom > 0.0 {
-            (numerator / denom).max(-1.0).min(1.0)
+            (numerator / denom).clamp(-1.0, 1.0)
         } else {
             0.0
         }
@@ -542,5 +487,74 @@ impl PrnuAnalyzer {
 impl Default for PrnuAnalyzer {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use image::{Rgb, RgbImage};
+
+    use super::*;
+
+    fn textured(width: u32, height: u32) -> DynamicImage {
+        let mut image = RgbImage::new(width, height);
+        for (x, y, pixel) in image.enumerate_pixels_mut() {
+            let v = (((x * 31) ^ (y * 13)) % 200 + 20) as u8;
+            *pixel = Rgb([v, v, v]);
+        }
+        DynamicImage::ImageRgb8(image)
+    }
+
+    fn pattern(width: u32, height: u32, seed: u32) -> GrayImage {
+        let mut image = GrayImage::new(width, height);
+        for (x, y, pixel) in image.enumerate_pixels_mut() {
+            *pixel = Luma([(((x * 3 + y * 5 + seed) % 256) as u8).wrapping_add(seed as u8)]);
+        }
+        image
+    }
+
+    #[test]
+    fn compare_patterns_handles_tall_images() {
+        // Indexing columns by the row count panicked whenever height > width.
+        let a = pattern(32, 128, 0);
+        let b = pattern(32, 128, 0);
+
+        let correlation = PrnuAnalyzer::new().compare_patterns(&a, &b);
+        assert!((correlation - 1.0).abs() < 1e-9, "self-correlation {correlation}");
+    }
+
+    #[test]
+    fn compare_patterns_is_bounded() {
+        let a = pattern(64, 40, 0);
+        let b = pattern(64, 40, 97);
+
+        let correlation = PrnuAnalyzer::new().compare_patterns(&a, &b);
+        assert!((-1.0..=1.0).contains(&correlation), "got {correlation}");
+    }
+
+    #[test]
+    fn undersized_images_error() {
+        let image = DynamicImage::ImageRgb8(RgbImage::new(64, 64));
+        assert!(PrnuAnalyzer::new().analyze(&image).is_err());
+    }
+
+    #[test]
+    fn analysis_scores_are_bounded() {
+        let config = PrnuConfig {
+            block_size: 16,
+            wavelet_levels: 1,
+            ..PrnuConfig::default()
+        };
+        let result = PrnuAnalyzer::with_config(config)
+            .analyze(&textured(64, 96))
+            .unwrap();
+
+        assert!((0.0..=1.0).contains(&result.consistency_score));
+        assert!((0.0..=1.0).contains(&result.manipulation_probability));
+
+        for region in &result.inconsistent_regions {
+            assert!(region.right() <= 64);
+            assert!(region.bottom() <= 96);
+        }
     }
 }

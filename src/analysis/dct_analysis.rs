@@ -1,6 +1,10 @@
 use image::{DynamicImage, GrayImage, Luma};
 
-use crate::{SRegion, error::Result, image_utils::rgb_to_gray};
+use crate::{
+    SRegion,
+    error::Result,
+    image_utils::{ensure_min_dimensions, mean_and_variance, rgb_to_gray},
+};
 
 #[derive(Debug, Clone)]
 pub struct DctConfig {
@@ -33,12 +37,17 @@ pub struct DctAnalysisResult {
     pub estimated_quantization_table: [[f64; 8]; 8],
 }
 
+// Index-based loops are the clearest expression of a dense 8x8 matrix
+// product and of the DCT basis construction; iterator rewrites here obscure
+// the (row, column) roles without changing the generated code.
+#[allow(clippy::needless_range_loop)]
 pub struct DctAnalyzer {
     config: DctConfig,
     dct_matrix: [[f64; 8]; 8],
     dct_matrix_t: [[f64; 8]; 8],
 }
 
+#[allow(clippy::needless_range_loop)]
 impl DctAnalyzer {
     pub fn new() -> Self {
         Self::with_config(DctConfig::default())
@@ -89,9 +98,7 @@ impl DctAnalyzer {
         let gray = rgb_to_gray(&image.to_rgb8());
         let (width, height) = gray.dimensions();
 
-        if width < 16 || height < 16 {
-            return Err(crate::error::ForensicsError::ImageTooSmall(16));
-        }
+        ensure_min_dimensions(width, height, 16)?;
 
         let coefficients = self.extract_all_dct_coefficients(&gray);
         let ac_histogram = self.build_ac_histogram(&coefficients);
@@ -163,7 +170,10 @@ impl DctAnalyzer {
     fn extract_all_dct_coefficients(&self, gray: &GrayImage) -> Vec<[[f64; 8]; 8]> {
         let (width, height) = gray.dimensions();
         let blocks_x = width / 8;
-        let blocks_y = width / 8;
+        // Was `width / 8`. On a tall image that analysed only the top square
+        // region; on a wide one it manufactured phantom blocks past the bottom
+        // edge, filled with the -128 level shift.
+        let blocks_y = height / 8;
 
         let mut coefficients = Vec::with_capacity((blocks_x * blocks_y) as usize);
 
@@ -178,54 +188,74 @@ impl DctAnalyzer {
         coefficients
     }
 
+    /// Histogram of the first AC coefficient across all blocks.
+    ///
+    /// Unquantised DCT coefficients of a decoded image routinely reach several
+    /// hundred, so the previous `ac + 128` offset clamped to `0..255` piled
+    /// most of the distribution into the two end bins. The range is derived
+    /// from the data instead, and the bin width is recorded so periodicity can
+    /// be interpreted in coefficient units.
     fn build_ac_histogram(&self, coefficients: &[[[f64; 8]; 8]]) -> Vec<u32> {
-        let mut histogram = vec![0u32; self.config.histogram_bins];
-        let half_bins = self.config.histogram_bins / 2;
+        let bins = self.config.histogram_bins.max(2);
+        let mut histogram = vec![0u32; bins];
+
+        if coefficients.is_empty() {
+            return histogram;
+        }
+
+        let extent = coefficients
+            .iter()
+            .map(|block| block[0][1].abs())
+            .fold(0.0f64, f64::max)
+            .max(1.0);
+
+        let scale = (bins as f64 - 1.0) / (2.0 * extent);
 
         for block in coefficients {
-            let ac = block[0][1];
-            let bin = ((ac + half_bins as f64) as i32)
-                .max(0)
-                .min(self.config.histogram_bins as i32 - 1) as usize;
+            let shifted = (block[0][1] + extent) * scale;
+            let bin = (shifted.round() as isize).clamp(0, bins as isize - 1) as usize;
             histogram[bin] += 1;
         }
 
         histogram
     }
 
+    /// Strength of the strongest periodic component in a histogram.
+    ///
+    /// Computed as a mean-centred, variance-normalised autocorrelation, which
+    /// is genuinely bounded by 1. The previous version divided a raw
+    /// (uncentred) correlation by a global norm, routinely exceeded 1, and was
+    /// then clamped — so it returned ~1.0 for almost every image and put a
+    /// permanent 0.4 floor under the double-compression score.
     fn detect_histogram_periodicity(&self, histogram: &[u32]) -> f64 {
         let n = histogram.len();
         if n < 10 {
             return 0.0;
         }
 
-        let hist_f64 = histogram.iter().map(|&x| x as f64).collect::<Vec<_>>();
+        let values: Vec<f64> = histogram.iter().map(|&x| x as f64).collect();
+        let mean = values.iter().sum::<f64>() / n as f64;
+        let variance = values.iter().map(|v| (v - mean).powi(2)).sum::<f64>() / n as f64;
+
+        if variance < 1e-10 {
+            return 0.0;
+        }
 
         let mut max_correlation = 0.0f64;
 
-        for period in 2..20 {
-            let mut correlation = 0.0;
-            let mut count = 0;
+        for period in 2..20.min(n) {
+            let mut sum = 0.0;
+            let count = n - period;
 
             for i in period..n {
-                correlation += hist_f64[i] * hist_f64[i - period];
-                count += 1;
+                sum += (values[i] - mean) * (values[i - period] - mean);
             }
 
-            if count > 0 {
-                correlation /= count as f64;
-
-                let sum_sq = hist_f64.iter().map(|x| x * x).sum::<f64>();
-                let norm = sum_sq / n as f64;
-
-                if norm > 0.0 {
-                    correlation /= norm;
-                    max_correlation = max_correlation.max(correlation);
-                }
-            }
+            let correlation = (sum / count as f64) / variance;
+            max_correlation = max_correlation.max(correlation);
         }
 
-        max_correlation.min(1.0)
+        max_correlation.clamp(0.0, 1.0)
     }
 
     fn estimate_quantization_table(&self, coefficients: &[[[f64; 8]; 8]]) -> [[f64; 8]; 8] {
@@ -325,7 +355,7 @@ impl DctAnalyzer {
             (50.0 / avg_ratio) as u8
         };
 
-        quality.max(1).min(100)
+        quality.clamp(1, 100)
     }
 
     fn detect_double_compression(
@@ -388,30 +418,16 @@ impl DctAnalyzer {
             return 0.0;
         }
 
-        let mut energy_variance = 0.0;
-        let mut total_energy = Vec::new();
-
-        for block in coefficients {
-            let mut block_energy = 0.0;
-            for y in 0..8 {
-                for x in 0..8 {
-                    block_energy += block[y][x] * block[y][x];
-                }
-            }
-            total_energy.push(block_energy);
-        }
+        let total_energy: Vec<f64> = coefficients
+            .iter()
+            .map(|block| block.iter().flatten().map(|c| c * c).sum())
+            .collect();
 
         if total_energy.is_empty() {
             return 0.0;
         }
 
-        let mean_energy = total_energy.iter().sum::<f64>() / total_energy.len() as f64;
-        energy_variance = total_energy
-            .iter()
-            .map(|e| (e - mean_energy).powi(2))
-            .sum::<f64>()
-            / total_energy.len() as f64;
-
+        let (mean_energy, energy_variance) = mean_and_variance(&total_energy);
         let normalized_variance = (energy_variance.sqrt() / mean_energy.max(1.0)).min(1.0);
 
         if normalized_variance > 0.5 {
@@ -448,14 +464,14 @@ impl DctAnalyzer {
             }
         }
 
-        let quality = match best_period {
+        
+
+        match best_period {
             0..=4 => 85,
             5..=8 => 75,
             9..=12 => 65,
             _ => 50,
-        };
-
-        quality
+        }
     }
 
     fn create_block_artifact_map(&self, gray: &GrayImage) -> GrayImage {
@@ -528,11 +544,11 @@ impl DctAnalyzer {
         gray: &GrayImage,
         coefficients: &[[[f64; 8]; 8]],
     ) -> Vec<SRegion> {
-        let (width, height) = gray.dimensions();
+        let (width, _height) = gray.dimensions();
         let blocks_x = (width / 8) as usize;
         let mut regions = Vec::new();
 
-        if coefficients.is_empty() {
+        if coefficients.is_empty() || blocks_x == 0 {
             return regions;
         }
 
@@ -580,5 +596,83 @@ impl DctAnalyzer {
 impl Default for DctAnalyzer {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use image::{Rgb, RgbImage};
+
+    use super::*;
+
+    fn textured(width: u32, height: u32) -> DynamicImage {
+        let mut image = RgbImage::new(width, height);
+        for (x, y, pixel) in image.enumerate_pixels_mut() {
+            let v = (((x * 17) ^ (y * 5)) % 256) as u8;
+            *pixel = Rgb([v, v, v]);
+        }
+        DynamicImage::ImageRgb8(image)
+    }
+
+    #[test]
+    fn block_grid_covers_the_full_height() {
+        // 64x256: eight columns of blocks, thirty-two rows. `blocks_y` was
+        // derived from the width, so only the top 64 rows were ever analysed.
+        let analyzer = DctAnalyzer::new();
+        let gray = rgb_to_gray(&textured(64, 256).to_rgb8());
+        let coefficients = analyzer.extract_all_dct_coefficients(&gray);
+
+        assert_eq!(coefficients.len(), (64 / 8) * (256 / 8));
+    }
+
+    #[test]
+    fn wide_images_produce_no_phantom_blocks() {
+        let analyzer = DctAnalyzer::new();
+        let gray = rgb_to_gray(&textured(256, 64).to_rgb8());
+        let coefficients = analyzer.extract_all_dct_coefficients(&gray);
+
+        assert_eq!(coefficients.len(), (256 / 8) * (64 / 8));
+    }
+
+    #[test]
+    fn periodicity_is_bounded_by_one() {
+        let analyzer = DctAnalyzer::new();
+
+        // A flat histogram must not read as strongly periodic.
+        let flat = vec![100u32; 256];
+        assert_eq!(analyzer.detect_histogram_periodicity(&flat), 0.0);
+
+        let periodic: Vec<u32> = (0..256).map(|i| if i % 4 == 0 { 200 } else { 5 }).collect();
+        let score = analyzer.detect_histogram_periodicity(&periodic);
+
+        assert!((0.0..=1.0).contains(&score), "score {score} out of range");
+        assert!(score > 0.5, "period-4 comb scored only {score}");
+    }
+
+    #[test]
+    fn ac_histogram_spreads_across_bins() {
+        let analyzer = DctAnalyzer::new();
+        let gray = rgb_to_gray(&textured(128, 128).to_rgb8());
+        let coefficients = analyzer.extract_all_dct_coefficients(&gray);
+        let histogram = analyzer.build_ac_histogram(&coefficients);
+
+        let occupied = histogram.iter().filter(|&&count| count > 0).count();
+        assert!(occupied > 2, "only {occupied} bins occupied; range clamped");
+    }
+
+    #[test]
+    fn undersized_images_error() {
+        let image = DynamicImage::ImageRgb8(RgbImage::new(8, 8));
+        assert!(DctAnalyzer::new().analyze(&image).is_err());
+    }
+
+    #[test]
+    fn anomalous_regions_stay_in_bounds() {
+        let result = DctAnalyzer::new().analyze(&textured(96, 160)).unwrap();
+
+        for region in &result.anomalous_regions {
+            assert!(region.right() <= 96);
+            assert!(region.bottom() <= 160);
+        }
     }
 }

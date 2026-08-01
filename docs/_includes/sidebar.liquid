@@ -1,0 +1,28 @@
+<nav class="sidebar-nav">
+    <h4>Getting Started</h4>
+    <ul>
+        <li><a href="/docs/installation/">Installation</a></li>
+        <li><a href="/docs/configuration/">Configuration</a></li>
+    </ul>
+
+    <h4>Analysis Modules</h4>
+    <ul>
+        <li><a href="/docs/modules/">Overview</a></li>
+        {% for module in site.data.modules.modules %}
+        <li><a href="/docs/modules/{{ module.slug }}/">{{ module.name }}</a></li>
+        {% endfor %}
+        <li><a href="/docs/modules/metadata/">Metadata (EXIF)</a></li>
+    </ul>
+
+    <h4>API Reference</h4>
+    <ul>
+        <li><a href="/docs/api/types/">Types</a></li>
+        <li><a href="/docs/api/traits/">Traits</a></li>
+        <li><a href="/docs/api/errors/">Errors</a></li>
+    </ul>
+
+    <h4>Meta</h4>
+    <ul>
+        <li><a href="/docs/changelog/">Changelog</a></li>
+    </ul>
+</nav>

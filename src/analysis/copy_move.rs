@@ -1,21 +1,26 @@
 use std::collections::HashMap;
 
 use image::{DynamicImage, GrayImage, Rgb, RgbImage};
-use num_complex::Complex;
-use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
-use rustfft::FftPlanner;
+use rayon::prelude::*;
 
 use crate::{
-    CopyMoveResult, MatchPair, SRegion,
+    CopyMoveResult, MatchPair, SRegion, draw,
     error::{ForensicsError, Result},
     image_utils::{block_variance, extract_block, rgb_to_gray},
 };
+
+/// Number of low-frequency DCT coefficients kept per block.
+const FEATURE_LEN: usize = 16;
 
 pub struct CopyMoveDetector {
     block_size: u32,
     similarity_threshold: f64,
     min_distance: u32,
     variance_threshold: f64,
+    /// Separable DCT-II basis, `block_size` x `block_size`, row-major.
+    dct_basis: Vec<f64>,
+    /// Zig-zag scan order over the block, truncated to [`FEATURE_LEN`].
+    zigzag: Vec<(usize, usize)>,
 }
 
 #[derive(Clone)]
@@ -28,9 +33,9 @@ struct BlockFeature {
 
 impl CopyMoveDetector {
     pub fn new(block_size: u32, similarity_threshold: f64, min_distance: u32) -> Result<Self> {
-        if block_size < 4 || block_size > 64 {
+        if !(4..=64).contains(&block_size) {
             return Err(ForensicsError::InvalidParameter(
-                "Block size must be between 4 and 64".into(),
+                "block size must be between 4 and 64".into(),
             ));
         }
 
@@ -39,7 +44,14 @@ impl CopyMoveDetector {
             similarity_threshold,
             min_distance,
             variance_threshold: 100.0,
+            dct_basis: dct_basis(block_size as usize),
+            zigzag: zigzag_order(block_size as usize, FEATURE_LEN),
         })
+    }
+
+    pub fn with_variance_threshold(mut self, threshold: f64) -> Self {
+        self.variance_threshold = threshold;
+        self
     }
 
     pub fn detect(&self, image: &DynamicImage) -> Result<CopyMoveResult> {
@@ -51,10 +63,8 @@ impl CopyMoveDetector {
             return Err(ForensicsError::ImageTooSmall(self.block_size * 2));
         }
 
-        let features = self.extract_features(&gray)?;
-
-        let matches = self.find_matches(&features)?;
-
+        let features = self.extract_features(&gray);
+        let matches = self.find_matches(&features);
         let visualization = self.create_visualization(&rgb, &matches);
 
         let confidence = if matches.is_empty() {
@@ -70,36 +80,36 @@ impl CopyMoveDetector {
         })
     }
 
-    fn extract_features(&self, gray: &GrayImage) -> Result<Vec<BlockFeature>> {
+    fn extract_features(&self, gray: &GrayImage) -> Vec<BlockFeature> {
         let (width, height) = gray.dimensions();
         let step = (self.block_size / 2).max(1);
 
-        let mut positions = Vec::new();
+        let positions: Vec<(u32, u32)> = crate::image_utils::full_blocks(
+            width,
+            height,
+            self.block_size,
+            step,
+        )
+        .map(|region| (region.x, region.y))
+        .collect();
 
-        for y in (0..height - self.block_size).step_by(step as usize) {
-            for x in (0..width - self.block_size).step_by(step as usize) {
-                positions.push((x, y));
-            }
-        }
-
-        let features = positions
+        positions
             .par_iter()
             .filter_map(|&(x, y)| self.extract_block_feature(gray, x, y))
-            .collect();
-
-        Ok(features)
+            .collect()
     }
 
     fn extract_block_feature(&self, gray: &GrayImage, x: u32, y: u32) -> Option<BlockFeature> {
         let block = extract_block(gray, x, y, self.block_size);
 
+        // Flat blocks match everything; skipping them is what keeps the
+        // pairwise stage tractable.
         if block_variance(&block) < self.variance_threshold {
             return None;
         }
 
         let dct_coeffs = self.compute_dct(&block);
-
-        let hash = self.compute_hash(&dct_coeffs);
+        let hash = Self::compute_hash(&dct_coeffs);
 
         Some(BlockFeature {
             x,
@@ -109,25 +119,47 @@ impl CopyMoveDetector {
         })
     }
 
+    /// Low-frequency coefficients of the 2-D DCT-II of a block.
+    ///
+    /// The previous implementation ran a 1-D FFT over the flattened block and
+    /// took magnitudes: neither a DCT nor two-dimensional, so features from
+    /// visually distinct blocks collided readily. This is the standard
+    /// separable transform, evaluated as `B * X * B^T`.
     fn compute_dct(&self, block: &[u8]) -> Vec<f64> {
         let n = self.block_size as usize;
-        let mut input = block
-            .iter()
-            .map(|&v| Complex::new(v as f64, 0.0))
-            .collect::<Vec<_>>();
 
-        while input.len() < n * n {
-            input.push(Complex::new(0.0, 0.0));
+        // Row transform: temp = B * X
+        let mut temp = vec![0.0f64; n * n];
+        for u in 0..n {
+            for j in 0..n {
+                let mut sum = 0.0;
+                for i in 0..n {
+                    sum += self.dct_basis[u * n + i] * (block[i * n + j] as f64 - 128.0);
+                }
+                temp[u * n + j] = sum;
+            }
         }
 
-        let mut planner = FftPlanner::new();
-        let fft = planner.plan_fft_forward(n * n);
-        fft.process(&mut input);
+        // Column transform: coeffs = temp * B^T
+        let mut coeffs = vec![0.0f64; n * n];
+        for u in 0..n {
+            for v in 0..n {
+                let mut sum = 0.0;
+                for j in 0..n {
+                    sum += temp[u * n + j] * self.dct_basis[v * n + j];
+                }
+                coeffs[u * n + v] = sum;
+            }
+        }
 
-        input.iter().take(16).map(|c| c.norm()).collect()
+        self.zigzag
+            .iter()
+            .map(|&(u, v)| coeffs[u * n + v])
+            .collect()
     }
 
-    fn compute_hash(&self, coeffs: &[f64]) -> u64 {
+    /// Sign-of-deviation hash over the feature vector, used for bucketing.
+    fn compute_hash(coeffs: &[f64]) -> u64 {
         let mean = coeffs.iter().sum::<f64>() / coeffs.len() as f64;
         let mut hash = 0u64;
 
@@ -140,52 +172,56 @@ impl CopyMoveDetector {
         hash
     }
 
-    fn find_matches(&self, features: &[BlockFeature]) -> Result<Vec<MatchPair>> {
-        let mut matches = Vec::new();
-
-        let mut hash_groups: HashMap<u64, Vec<usize>> = HashMap::new();
+    fn find_matches(&self, features: &[BlockFeature]) -> Vec<MatchPair> {
+        // Bucket by exact hash and by each single-bit neighbour, so blocks
+        // straddling a threshold still meet. The old `hash ^ offset` for
+        // `offset in 0..4` only ever perturbed the low two bits while inserting
+        // every feature into four buckets, so most pairs were compared
+        // redundantly and genuine near-matches were missed.
+        let mut buckets: HashMap<u64, Vec<usize>> = HashMap::new();
 
         for (i, feature) in features.iter().enumerate() {
-            for offset in 0..4u64 {
-                let h = feature.hash ^ offset;
-                hash_groups.entry(h).or_default().push(i);
+            buckets.entry(feature.hash).or_default().push(i);
+
+            for bit in 0..FEATURE_LEN.min(64) {
+                buckets
+                    .entry(feature.hash ^ (1u64 << bit))
+                    .or_default()
+                    .push(i);
             }
         }
 
-        for indices in hash_groups.values() {
+        let mut matches = Vec::new();
+        let mut seen = std::collections::HashSet::new();
+
+        for indices in buckets.values() {
             if indices.len() < 2 {
                 continue;
             }
 
             for i in 0..indices.len() {
                 for j in (i + 1)..indices.len() {
-                    let f1 = &features[indices[i]];
-                    let f2 = &features[indices[j]];
-
-                    let dx = (f1.x as i32 - f2.x as i32).abs() as u32;
-                    let dy = (f1.y as i32 - f2.y as i32).abs() as u32;
-                    let distance = ((dx * dx + dy * dy) as f64).sqrt() as u32;
-
-                    if distance < self.min_distance {
+                    let (a, b) = (indices[i].min(indices[j]), indices[i].max(indices[j]));
+                    if !seen.insert((a, b)) {
                         continue;
                     }
 
-                    let similarity = self.calculate_similarity(&f1.dct_coeffs, &f2.dct_coeffs);
+                    let f1 = &features[a];
+                    let f2 = &features[b];
+
+                    let dx = (f1.x as i64 - f2.x as i64) as f64;
+                    let dy = (f1.y as i64 - f2.y as i64) as f64;
+
+                    if (dx * dx + dy * dy).sqrt() < self.min_distance as f64 {
+                        continue;
+                    }
+
+                    let similarity = Self::calculate_similarity(&f1.dct_coeffs, &f2.dct_coeffs);
 
                     if similarity >= self.similarity_threshold {
                         matches.push(MatchPair {
-                            source: SRegion {
-                                x: f1.x,
-                                y: f1.y,
-                                width: self.block_size,
-                                height: self.block_size,
-                            },
-                            target: SRegion {
-                                x: f2.x,
-                                y: f2.y,
-                                width: self.block_size,
-                                height: self.block_size,
-                            },
+                            source: SRegion::new(f1.x, f1.y, self.block_size, self.block_size),
+                            target: SRegion::new(f2.x, f2.y, self.block_size, self.block_size),
                             similarity,
                         });
                     }
@@ -196,7 +232,8 @@ impl CopyMoveDetector {
         self.filter_matches(matches)
     }
 
-    fn calculate_similarity(&self, coeffs1: &[f64], coeffs2: &[f64]) -> f64 {
+    /// Pearson correlation between two feature vectors, floored at zero.
+    fn calculate_similarity(coeffs1: &[f64], coeffs2: &[f64]) -> f64 {
         if coeffs1.len() != coeffs2.len() || coeffs1.is_empty() {
             return 0.0;
         }
@@ -224,112 +261,215 @@ impl CopyMoveDetector {
         }
     }
 
-    fn filter_matches(&self, mut matches: Vec<MatchPair>) -> Result<Vec<MatchPair>> {
-        matches.sort_by(|a, b| b.similarity.partial_cmp(&a.similarity).unwrap());
+    /// Keep the strongest non-overlapping matches, best first.
+    fn filter_matches(&self, mut matches: Vec<MatchPair>) -> Vec<MatchPair> {
+        matches.sort_by(|a, b| {
+            b.similarity
+                .partial_cmp(&a.similarity)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
 
-        let mut filtered = Vec::new();
+        let mut filtered: Vec<MatchPair> = Vec::new();
 
-        for m in matches {
-            let overlaps = filtered.iter().any(|existing: &MatchPair| {
-                self.regions_overlap(&m.source, &existing.source)
-                    || self.regions_overlap(&m.target, &existing.source)
-                    || self.regions_overlap(&m.source, &existing.target)
-                    || self.regions_overlap(&m.target, &existing.target)
+        for candidate in matches {
+            let overlaps = filtered.iter().any(|existing| {
+                candidate.source.overlaps(&existing.source)
+                    || candidate.target.overlaps(&existing.source)
+                    || candidate.source.overlaps(&existing.target)
+                    || candidate.target.overlaps(&existing.target)
             });
 
             if !overlaps {
-                filtered.push(m);
+                filtered.push(candidate);
             }
         }
 
-        Ok(filtered)
-    }
-
-    fn regions_overlap(&self, a: &SRegion, b: &SRegion) -> bool {
-        let overlap_x = a.x < b.x + b.width && a.x + a.width > b.x;
-        let overlap_y = a.y < b.y + b.height && a.y + a.height > b.y;
-
-        overlap_x && overlap_y
+        filtered
     }
 
     fn create_visualization(&self, original: &RgbImage, matches: &[MatchPair]) -> RgbImage {
         let mut vis = original.clone();
 
         for (i, match_pair) in matches.iter().enumerate() {
-            let color = Rgb([
-                ((i * 50) % 255) as u8,
-                ((i * 80 + 100) % 255) as u8,
-                ((i * 120 + 50) % 255) as u8,
-            ]);
+            // Golden-angle hue stepping keeps adjacent matches distinguishable.
+            let color = hue_to_rgb((i as f64 * 137.5) % 360.0);
 
-            self.draw_rectangle(&mut vis, &match_pair.source, color);
-            self.draw_rectangle(&mut vis, &match_pair.target, color);
+            draw::rect(&mut vis, &match_pair.source, color, 1);
+            draw::rect(&mut vis, &match_pair.target, color, 1);
 
-            self.draw_line(
-                &mut vis,
-                match_pair.source.x + match_pair.source.width / 2,
-                match_pair.source.y + match_pair.source.height / 2,
-                match_pair.target.x + match_pair.target.width / 2,
-                match_pair.target.y + match_pair.target.height / 2,
-                color,
-            );
+            let (sx, sy) = match_pair.source.center();
+            let (tx, ty) = match_pair.target.center();
+            draw::line(&mut vis, sx as i32, sy as i32, tx as i32, ty as i32, color);
         }
 
         vis
     }
+}
 
-    fn draw_rectangle(&self, image: &mut RgbImage, region: &SRegion, color: Rgb<u8>) {
-        let (width, height) = image.dimensions();
+/// Orthonormal DCT-II basis of size `n`, row-major.
+fn dct_basis(n: usize) -> Vec<f64> {
+    let mut basis = vec![0.0f64; n * n];
 
-        for x in region.x..(region.x + region.width).min(width) {
-            if region.y < height {
-                image.put_pixel(x, region.y, color);
-            }
-            if region.y + region.height - 1 < height {
-                image.put_pixel(x, region.y + region.height - 1, color);
-            }
+    for u in 0..n {
+        let scale = if u == 0 {
+            (1.0 / n as f64).sqrt()
+        } else {
+            (2.0 / n as f64).sqrt()
+        };
+
+        for i in 0..n {
+            basis[u * n + i] = scale
+                * (std::f64::consts::PI * (2.0 * i as f64 + 1.0) * u as f64 / (2.0 * n as f64))
+                    .cos();
+        }
+    }
+
+    basis
+}
+
+/// The first `count` positions of an `n` x `n` zig-zag scan.
+fn zigzag_order(n: usize, count: usize) -> Vec<(usize, usize)> {
+    let mut order = Vec::with_capacity(n * n);
+
+    for diagonal in 0..(2 * n - 1) {
+        let cells: Vec<(usize, usize)> = (0..=diagonal)
+            .filter_map(|u| {
+                let v = diagonal.checked_sub(u)?;
+                (u < n && v < n).then_some((u, v))
+            })
+            .collect();
+
+        // Alternate direction along each diagonal, as in the JPEG scan.
+        if diagonal % 2 == 0 {
+            order.extend(cells.into_iter().rev());
+        } else {
+            order.extend(cells);
+        }
+    }
+
+    order.truncate(count.min(n * n));
+    order
+}
+
+fn hue_to_rgb(hue: f64) -> Rgb<u8> {
+    let sector = hue / 60.0;
+    let x = 1.0 - (sector % 2.0 - 1.0).abs();
+
+    let (r, g, b) = match sector as u32 {
+        0 => (1.0, x, 0.0),
+        1 => (x, 1.0, 0.0),
+        2 => (0.0, 1.0, x),
+        3 => (0.0, x, 1.0),
+        4 => (x, 0.0, 1.0),
+        _ => (1.0, 0.0, x),
+    };
+
+    Rgb([
+        (r * 255.0) as u8,
+        (g * 255.0) as u8,
+        (b * 255.0) as u8,
+    ])
+}
+
+#[cfg(test)]
+mod tests {
+    use image::RgbImage;
+
+    use super::*;
+
+    /// Deterministic xorshift, so the fixture needs no `rand` dependency.
+    fn noise_byte(state: &mut u64) -> u8 {
+        *state ^= *state << 13;
+        *state ^= *state >> 7;
+        *state ^= *state << 17;
+        (*state >> 24) as u8
+    }
+
+    /// Textured noise, then a patch copied to a distant location.
+    fn image_with_duplicate_patch() -> DynamicImage {
+        let mut state = 0x2545_F491_4F6C_DD1Du64;
+        let mut image = RgbImage::new(256, 256);
+
+        for pixel in image.pixels_mut() {
+            let v = noise_byte(&mut state);
+            *pixel = Rgb([v, v, v]);
         }
 
-        for y in region.y..(region.y + region.height).min(height) {
-            if region.x < width {
-                image.put_pixel(region.x, y, color);
-            }
-            if region.x + region.width - 1 < width {
-                image.put_pixel(region.x + region.width - 1, y, color);
+        // Both corners sit on the 8px feature stride, so a source block and its
+        // copy land on the same sub-patch offset and can actually be paired.
+        let patch: Vec<Rgb<u8>> = (0..48 * 48)
+            .map(|i| *image.get_pixel(16 + (i % 48), 16 + (i / 48)))
+            .collect();
+
+        for i in 0..48u32 * 48 {
+            image.put_pixel(184 + (i % 48), 184 + (i / 48), patch[i as usize]);
+        }
+
+        DynamicImage::ImageRgb8(image)
+    }
+
+    #[test]
+    fn rejects_out_of_range_block_sizes() {
+        assert!(CopyMoveDetector::new(2, 0.9, 10).is_err());
+        assert!(CopyMoveDetector::new(128, 0.9, 10).is_err());
+        assert!(CopyMoveDetector::new(16, 0.9, 10).is_ok());
+    }
+
+    #[test]
+    fn finds_a_copied_patch() {
+        let detector = CopyMoveDetector::new(16, 0.95, 50).unwrap();
+        let result = detector.detect(&image_with_duplicate_patch()).unwrap();
+
+        assert!(
+            !result.matches.is_empty(),
+            "no duplicate region found in a synthetic copy-move image"
+        );
+    }
+
+    #[test]
+    fn reports_no_matches_on_a_flat_image() {
+        let image = DynamicImage::ImageRgb8(RgbImage::from_pixel(128, 128, Rgb([90, 90, 90])));
+        let result = CopyMoveDetector::new(16, 0.95, 50)
+            .unwrap()
+            .detect(&image)
+            .unwrap();
+
+        assert!(result.matches.is_empty());
+        assert_eq!(result.confidence, 0.0);
+    }
+
+    #[test]
+    fn dct_basis_is_orthonormal() {
+        let n = 8;
+        let basis = dct_basis(n);
+
+        for u in 0..n {
+            for v in 0..n {
+                let dot: f64 = (0..n).map(|i| basis[u * n + i] * basis[v * n + i]).sum();
+                let expected = if u == v { 1.0 } else { 0.0 };
+                assert!((dot - expected).abs() < 1e-9, "row {u} . row {v} = {dot}");
             }
         }
     }
 
-    fn draw_line(&self, image: &mut RgbImage, x0: u32, y0: u32, x1: u32, y1: u32, color: Rgb<u8>) {
-        let (width, height) = image.dimensions();
+    #[test]
+    fn zigzag_starts_at_dc_and_has_no_duplicates() {
+        let order = zigzag_order(8, 16);
+        assert_eq!(order[0], (0, 0));
+        assert_eq!(order.len(), 16);
 
-        let dx = (x1 as i32 - x0 as i32).abs();
-        let dy = -(y1 as i32 - y0 as i32).abs();
-        let sx = if x0 < x1 { 1i32 } else { -1i32 };
-        let sy = if y0 < y1 { 1i32 } else { -1i32 };
-        let mut err = dx + dy;
+        let unique: std::collections::HashSet<_> = order.iter().collect();
+        assert_eq!(unique.len(), 16);
+    }
 
-        let mut x = x0 as i32;
-        let mut y = y0 as i32;
+    #[test]
+    fn image_too_small_is_reported() {
+        let image = DynamicImage::ImageRgb8(RgbImage::new(20, 20));
+        let result = CopyMoveDetector::new(16, 0.9, 10).unwrap().detect(&image);
 
-        loop {
-            if x >= 0 && x < width as i32 && y >= 0 && y < height as i32 {
-                image.put_pixel(x as u32, y as u32, color);
-            }
-
-            if x == x1 as i32 && y == y1 as i32 {
-                break;
-            }
-
-            let e2 = 2 * err;
-            if e2 >= dy {
-                err += dy;
-                x += sx;
-            }
-            if e2 <= dx {
-                err += dx;
-                y += sy;
-            }
-        }
+        assert!(matches!(
+            result,
+            Err(ForensicsError::ImageTooSmall(32))
+        ));
     }
 }

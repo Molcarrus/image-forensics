@@ -247,7 +247,7 @@ impl Visualizer {
             copy_move: copy_move_vis,
             noise: noise_vis,
             combined,
-            tampering_probability: report.tampering_ability,
+            tampering_probability: report.tampering_probability,
         }
     }
 
@@ -593,7 +593,7 @@ impl Visualizer {
     ) -> RgbImage {
         let ela_vis = self.visualize_ela(original, &report.ela);
         let copy_move_vis = self.visualize_copy_move(original, &report.copy_move);
-        let noise_vis = self.visualize_noise(original, &report.noise);
+        let _noise_vis = self.visualize_noise(original, &report.noise);
 
         let combined =
             self.create_combined_overview(original, &report.ela, &report.copy_move, &report.noise);

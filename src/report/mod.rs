@@ -52,7 +52,7 @@ pub struct MetadataReportSection {
 impl From<&FullAnalysisReport> for JsonReport {
     fn from(report: &FullAnalysisReport) -> Self {
         Self {
-            tampering_probability: report.tampering_ability,
+            tampering_probability: report.tampering_probability,
             ela_analysis: ElaReportSection {
                 max_difference: report.ela.max_difference,
                 mean_difference: report.ela.mean_difference,

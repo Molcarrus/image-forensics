@@ -1,21 +1,53 @@
+use std::f64::consts::PI;
+
 use image::{DynamicImage, GrayImage, Luma};
 
-use crate::{SRegion, error::Result, image_utils::rgb_to_gray};
+use crate::{
+    SRegion,
+    error::Result,
+    image_utils::{angle_to_u8, clipped_blocks, rgb_to_gray, sobel_polar, u8_to_angle},
+    region::merge_regions,
+};
 
 pub struct LuminanceGradientAnalyzer {
     block_size: u32,
+    /// Gradients weaker than this are treated as flat and ignored.
+    magnitude_threshold: f64,
+    /// A block deviating from the dominant direction by more than this is flagged.
+    angle_tolerance: f64,
 }
 
 pub struct LuminanceGradientResult {
     pub gradient_map: GrayImage,
     pub direction_map: GrayImage,
     pub inconsistent_regions: Vec<SRegion>,
+    /// Dominant illumination direction in radians, within `[-PI, PI]`.
     pub dominant_direction: f64,
+    /// Circular concentration of the gradient directions, within `[0, 1]`.
+    pub direction_confidence: f64,
 }
 
 impl LuminanceGradientAnalyzer {
     pub fn new(block_size: u32) -> Self {
-        Self { block_size }
+        Self {
+            block_size: block_size.max(1),
+            magnitude_threshold: 30.0,
+            angle_tolerance: PI / 4.0,
+        }
+    }
+
+    pub fn with_angle_tolerance(mut self, radians: f64) -> Self {
+        self.angle_tolerance = radians;
+        self
+    }
+
+    /// Set the Sobel magnitude below which a pixel counts as flat.
+    ///
+    /// The default of 30 suits high-contrast scenes; a gentle luminance ramp
+    /// carries only a few levels per pixel and needs a lower cutoff.
+    pub fn with_magnitude_threshold(mut self, threshold: f64) -> Self {
+        self.magnitude_threshold = threshold.max(0.0);
+        self
     }
 
     pub fn analyze(&self, image: &DynamicImage) -> Result<LuminanceGradientResult> {
@@ -26,125 +58,162 @@ impl LuminanceGradientAnalyzer {
         let mut direction_map = GrayImage::new(width, height);
         let mut directions = Vec::new();
 
-        for y in 1..height - 1 {
-            for x in 1..width - 1 {
-                let gx = self.sobel_x(&gray, x, y);
-                let gy = self.sobel_y(&gray, x, y);
+        for y in 0..height {
+            for x in 0..width {
+                let (magnitude, direction) = sobel_polar(&gray, x, y);
 
-                let magnitude = (gx * gx + gy * gy).sqrt();
-                let direction = gy.atan2(gx);
+                gradient_map.put_pixel(x, y, Luma([magnitude.min(255.0) as u8]));
+                direction_map.put_pixel(x, y, Luma([angle_to_u8(direction)]));
 
-                gradient_map.put_pixel(x, y, Luma([(magnitude.min(255.0)) as u8]));
-
-                let dir_normalized = ((direction + std::f64::consts::PI)
-                    / (2.0 * std::f64::consts::PI)
-                    * 255.0) as u8;
-                direction_map.put_pixel(x, y, Luma([dir_normalized]));
-
-                if magnitude > 30.0 {
-                    directions.push(direction);
+                if magnitude > self.magnitude_threshold {
+                    directions.push((direction, magnitude));
                 }
             }
         }
 
-        let dominant_direction = self.find_dominant_direction(&directions);
+        let (dominant_direction, direction_confidence) = circular_mean(&directions);
 
         let inconsistent_regions =
-            self.find_incosistent_regions(&direction_map, &gradient_map, dominant_direction);
+            self.find_inconsistent_regions(&direction_map, &gradient_map, dominant_direction);
 
         Ok(LuminanceGradientResult {
             gradient_map,
             direction_map,
             inconsistent_regions,
             dominant_direction,
+            direction_confidence,
         })
     }
 
-    fn sobel_x(&self, gray: &GrayImage, x: u32, y: u32) -> f64 {
-        let p = |dx: i32, dy: i32| -> f64 {
-            gray.get_pixel((x as i32 + dx) as u32, (y as i32 + dy) as u32)[0] as f64
-        };
-
-        -p(-1, -1) - 2.0 * p(-1, 0) - p(-1, 1) + p(1, -1) - 2.0 * p(1, 0) + p(1, 1)
-    }
-
-    fn sobel_y(&self, gray: &GrayImage, x: u32, y: u32) -> f64 {
-        let p = |dx: i32, dy: i32| -> f64 {
-            gray.get_pixel((x as i32 + dx) as u32, (y as i32 + dy) as u32)[0] as f64
-        };
-
-        -p(-1, -1) - 2.0 * p(0, -1) - p(1, -1) + p(-1, 1) + 2.0 * p(0, 1) + p(1, 1)
-    }
-
-    fn find_dominant_direction(&self, directions: &[f64]) -> f64 {
-        if directions.is_empty() {
-            return 0.0;
-        }
-
-        let bins = 36;
-        let mut histogram = vec![0u32; bins];
-
-        for &dir in directions {
-            let bin = ((dir + std::f64::consts::PI) / (2.0 * std::f64::consts::PI) * bins as f64)
-                as usize;
-            histogram[bin.min(bins - 1)] += 1;
-        }
-
-        let max_bin = histogram
-            .iter()
-            .enumerate()
-            .max_by_key(|&(_, count)| count)
-            .map(|(i, _)| i)
-            .unwrap_or(0);
-
-        (max_bin as f64 / bins as f64) + 2.0 * std::f64::consts::PI - std::f64::consts::PI
-    }
-
-    fn find_incosistent_regions(
+    fn find_inconsistent_regions(
         &self,
         direction_map: &GrayImage,
         gradient_map: &GrayImage,
         dominant: f64,
     ) -> Vec<SRegion> {
         let (width, height) = direction_map.dimensions();
-        let mut regions = Vec::new();
 
-        let dominant_normalized =
-            ((dominant + std::f64::consts::PI) / (2.0 * std::f64::consts::PI) * 255.0) as i32;
+        let regions = clipped_blocks(width, height, self.block_size, self.block_size)
+            .filter(|block| {
+                // Average the directions as unit vectors. Averaging the raw u8
+                // codes wraps incorrectly across the -PI/+PI seam.
+                let mut samples = Vec::new();
 
-        for by in (0..height).step_by(self.block_size as usize) {
-            for bx in (0..width).step_by(self.block_size as usize) {
-                let mut dir_sum = 0i32;
-                let mut grad_sum = 0.0;
-                let mut count = 0;
-
-                for y in by..(by + self.block_size).min(height) {
-                    for x in bx..(bx + self.block_size).min(width) {
-                        let grad = gradient_map.get_pixel(x, y)[0] as f64;
-                        if grad > 20.0 {
-                            dir_sum += direction_map.get_pixel(x, y)[0] as i32;
-                            grad_sum += grad;
-                            count += 1;
-                        }
+                for (x, y) in block.pixels() {
+                    let magnitude = gradient_map.get_pixel(x, y)[0] as f64;
+                    if magnitude > self.magnitude_threshold * 0.65 {
+                        samples.push((u8_to_angle(direction_map.get_pixel(x, y)[0]), magnitude));
                     }
                 }
 
-                if count > (self.block_size * self.block_size / 4) as i32 {
-                    let avg_dir = dir_sum / count;
-                    let dir_diff = (avg_dir - dominant_normalized).abs();
-
-                    if dir_diff > 32 && dir_diff < 224 {
-                        regions.push(SRegion {
-                            x: bx,
-                            y: by,
-                            width: self.block_size.min(width - bx),
-                            height: self.block_size.min(height - by),
-                        });
-                    }
+                // Require a quarter of the block to carry usable structure.
+                if (samples.len() as u64) * 4 < block.area() {
+                    return false;
                 }
-            }
+
+                let (block_direction, confidence) = circular_mean(&samples);
+                confidence > 0.3 && angular_distance(block_direction, dominant) > self.angle_tolerance
+            })
+            .collect();
+
+        merge_regions(regions, self.block_size / 2)
+    }
+}
+
+/// Magnitude-weighted circular mean, returning `(angle, concentration)`.
+///
+/// The concentration is the resultant length: 1 when every sample agrees, 0
+/// when they cancel out.
+fn circular_mean(samples: &[(f64, f64)]) -> (f64, f64) {
+    let mut sin_sum = 0.0;
+    let mut cos_sum = 0.0;
+    let mut weight_sum = 0.0;
+
+    for &(angle, weight) in samples {
+        sin_sum += angle.sin() * weight;
+        cos_sum += angle.cos() * weight;
+        weight_sum += weight;
+    }
+
+    if weight_sum < 1e-10 {
+        return (0.0, 0.0);
+    }
+
+    let mean_sin = sin_sum / weight_sum;
+    let mean_cos = cos_sum / weight_sum;
+
+    (
+        mean_sin.atan2(mean_cos),
+        (mean_sin * mean_sin + mean_cos * mean_cos).sqrt(),
+    )
+}
+
+/// Shortest angular separation between two directions, within `[0, PI]`.
+fn angular_distance(a: f64, b: f64) -> f64 {
+    let mut diff = (a - b).abs() % (2.0 * PI);
+    if diff > PI {
+        diff = 2.0 * PI - diff;
+    }
+    diff
+}
+
+#[cfg(test)]
+mod tests {
+    use image::{Rgb, RgbImage};
+
+    use super::*;
+
+    /// Horizontal ramp: brightness increasing to the right.
+    fn horizontal_ramp(width: u32, height: u32) -> DynamicImage {
+        let mut image = RgbImage::new(width, height);
+        for (x, _, pixel) in image.enumerate_pixels_mut() {
+            let v = ((x * 255) / width.max(1)) as u8;
+            *pixel = Rgb([v, v, v]);
         }
+        DynamicImage::ImageRgb8(image)
+    }
 
-        regions
+    /// A gentle ramp spans only ~2 levels per pixel, so the default cutoff of
+    /// 30 would discard every sample.
+    fn ramp_analyzer() -> LuminanceGradientAnalyzer {
+        LuminanceGradientAnalyzer::new(16).with_magnitude_threshold(5.0)
+    }
+
+    #[test]
+    fn dominant_direction_stays_within_pi() {
+        let result = ramp_analyzer().analyze(&horizontal_ramp(128, 128)).unwrap();
+
+        // The old expression was `(bin / bins) + 2*PI - PI`, missing a
+        // multiplication, so it always landed in [PI, PI + 1).
+        assert!(
+            (-PI..=PI).contains(&result.dominant_direction),
+            "direction {} out of range",
+            result.dominant_direction
+        );
+    }
+
+    #[test]
+    fn horizontal_ramp_points_right() {
+        let result = ramp_analyzer().analyze(&horizontal_ramp(128, 128)).unwrap();
+
+        // Brightness rises with x, so the gradient points along +x: angle ~0.
+        assert!(
+            angular_distance(result.dominant_direction, 0.0) < 0.2,
+            "direction was {}",
+            result.dominant_direction
+        );
+        assert!(result.direction_confidence > 0.8);
+    }
+
+    #[test]
+    fn uniform_lighting_has_no_inconsistent_regions() {
+        let result = ramp_analyzer().analyze(&horizontal_ramp(128, 128)).unwrap();
+
+        assert!(result.inconsistent_regions.is_empty());
+    }
+
+    #[test]
+    fn angular_distance_wraps_across_the_seam() {
+        assert!(angular_distance(PI - 0.1, -PI + 0.1) < 0.25);
     }
 }

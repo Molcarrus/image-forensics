@@ -1,0 +1,23 @@
+site:
+  title: image-forensics
+  description: A Rust library for digital image forensics — detecting manipulation, forgery and inconsistency in images.
+  base_url: https://molcarrus.github.io/image-forensics
+
+# Directory-style permalinks, so the extensionless links used throughout the
+# navigation resolve (`/docs/installation` -> `/docs/installation/index.html`).
+# `index.md` overrides this with `permalink: "/"` in its own front matter.
+pages:
+  default:
+    permalink: "/{{parent}}/{{name}}/"
+
+posts:
+  dir: posts
+  rss: rss.xml
+  default:
+    permalink: "/{{parent}}/{{name}}/"
+    layout: post.liquid
+
+# Cobalt does not chain layouts: a `extends:` key in a layout's front matter is
+# emitted as literal text rather than interpreted. Every layout under
+# `_layouts/` is therefore a complete document that pulls the shared shell in
+# via `{% include %}`.

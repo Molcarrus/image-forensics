@@ -1,9 +1,14 @@
 use image::{DynamicImage, GrayImage, Luma, Rgb, RgbImage};
+use rayon::prelude::*;
 
-use crate::{SRegion, error::Result};
+use crate::{
+    SRegion, draw,
+    error::Result,
+    image_utils::{clipped_blocks, ensure_min_dimensions, full_blocks, sobel},
+};
 
 #[derive(Debug, Clone)]
-pub struct ChromaticAbberationConfig {
+pub struct ChromaticAberrationConfig {
     pub block_size: u32,
     pub edge_threshold: f64,
     pub min_edge_strength: f64,
@@ -11,7 +16,7 @@ pub struct ChromaticAbberationConfig {
     pub inconsistency_threshold: f64,
 }
 
-impl Default for ChromaticAbberationConfig {
+impl Default for ChromaticAberrationConfig {
     fn default() -> Self {
         Self {
             block_size: 64,
@@ -57,15 +62,15 @@ pub struct RadialAberrationModel {
 }
 
 pub struct ChromaticAberrationAnalyzer {
-    config: ChromaticAbberationConfig,
+    config: ChromaticAberrationConfig,
 }
 
 impl ChromaticAberrationAnalyzer {
     pub fn new() -> Self {
-        Self::with_config(ChromaticAbberationConfig::default())
+        Self::with_config(ChromaticAberrationConfig::default())
     }
 
-    pub fn with_config(config: ChromaticAbberationConfig) -> Self {
+    pub fn with_config(config: ChromaticAberrationConfig) -> Self {
         Self { config }
     }
 
@@ -73,17 +78,13 @@ impl ChromaticAberrationAnalyzer {
         let rgb = image.to_rgb8();
         let (width, height) = rgb.dimensions();
 
-        if width < self.config.block_size * 2 || height < self.config.block_size * 2 {
-            return Err(crate::error::ForensicsError::ImageTooSmall(
-                self.config.block_size * 2,
-            ));
-        }
+        ensure_min_dimensions(width, height, self.config.block_size * 2)?;
 
         let (red, green, blue) = self.split_channels(&rgb);
 
         let measurements = self.measure_aberration(&red, &green, &blue);
 
-        let aberration_map = self.create_abberation_map(width, height, &measurements);
+        let aberration_map = self.create_aberration_map(width, height, &measurements);
 
         let radial_model = self.fit_radial_model(&measurements, width, height);
 
@@ -149,19 +150,16 @@ impl ChromaticAberrationAnalyzer {
     ) -> Vec<AberrationMeasurement> {
         let (width, height) = green.dimensions();
         let block_size = self.config.block_size;
-        let mut measurements = Vec::new();
 
-        for by in (0..height - block_size).step_by(block_size as usize / 2) {
-            for bx in (0..width - block_size).step_by(block_size as usize / 2) {
-                if let Some(measurement) =
-                    self.measure_block_aberration(red, green, blue, bx, by, block_size)
-                {
-                    measurements.push(measurement);
-                }
-            }
-        }
+        let blocks: Vec<SRegion> =
+            full_blocks(width, height, block_size, (block_size / 2).max(1)).collect();
 
-        measurements
+        blocks
+            .par_iter()
+            .filter_map(|region| {
+                self.measure_block_aberration(red, green, blue, region.x, region.y, block_size)
+            })
+            .collect()
     }
 
     fn measure_block_aberration(
@@ -222,8 +220,7 @@ impl ChromaticAberrationAnalyzer {
 
         for y in (by + 1)..(by + size - 1).min(height - 1) {
             for x in (bx + 1)..(bx + size - 1).min(width - 1) {
-                let gx = self.sobel_x(gray, x, y);
-                let gy = self.sobel_y(gray, x, y);
+                let (gx, gy) = sobel(gray, x, y);
                 let magnitude = (gx * gx + gy * gy).sqrt();
 
                 if magnitude > self.config.edge_threshold {
@@ -235,69 +232,84 @@ impl ChromaticAberrationAnalyzer {
         edges
     }
 
-    fn sobel_x(&self, gray: &GrayImage, x: u32, y: u32) -> f64 {
-        let get = |dx: i32, dy: i32| -> f64 {
-            let px = (x as i32 + dx).max(0) as u32;
-            let py = (y as i32 + dy).max(0) as u32;
-            let (w, h) = gray.dimensions();
-            gray.get_pixel(px.min(w - 1), py.min(h - 1))[0] as f64
-        };
-
-        -get(-1, -1) - 2.0 * get(-1, 0) - get(-1, 1) + get(1, -1) + 2.0 * get(1, 0) + get(1, 1)
-    }
-
-    fn sobel_y(&self, gray: &GrayImage, x: u32, y: u32) -> f64 {
-        let get = |dx: i32, dy: i32| -> f64 {
-            let px = (x as i32 + dx).max(0) as u32;
-            let py = (y as i32 + dy).max(0) as u32;
-            let (w, h) = gray.dimensions();
-            gray.get_pixel(px.min(w - 1), py.min(h - 1))[0] as f64
-        };
-
-        -get(-1, -1) - 2.0 * get(0, -1) - get(1, -1) + get(-1, 1) + 2.0 * get(0, 1) + get(1, 1)
-    }
-
+    /// Best sub-pixel alignment of `channel` onto `reference` at the edge points.
+    ///
+    /// Coarse-to-fine: whole-pixel shifts first, then two refinement passes at
+    /// 1/3 and 1/9 of a pixel around the winner. The previous version evaluated
+    /// every integer shift crossed with a 3x3 sub-pixel grid — 1089 full
+    /// correlations per block, each over every edge point — which for a 12 MP
+    /// image works out at roughly 10^10 operations, single-threaded.
     fn measure_channel_shift(
         &self,
         channel: &GrayImage,
         reference: &GrayImage,
         edge_points: &[(u32, u32, f64, f64)],
     ) -> (f64, f64, f64) {
-        // let (width, height) = reference.dimensions();
         let search_radius = self.config.max_aberration.ceil() as i32;
 
         let mut best_shift_x = 0.0;
         let mut best_shift_y = 0.0;
-        let mut best_correlation = 0.0;
+        let mut best_correlation = f64::NEG_INFINITY;
 
         for sy in -search_radius..=search_radius {
             for sx in -search_radius..=search_radius {
-                for sub_y in 0..3 {
-                    for sub_x in 0..3 {
-                        let shift_x = sx as f64 + (sub_x as f64 - 1.0) / 3.0;
-                        let shift_y = sy as f64 + (sub_y as f64 - 1.0) / 3.0;
+                let correlation = self.calculate_edge_correlation(
+                    channel,
+                    reference,
+                    edge_points,
+                    sx as f64,
+                    sy as f64,
+                );
 
-                        let correlation = self.calculate_edge_correlation(
-                            channel,
-                            reference,
-                            edge_points,
-                            shift_x,
-                            shift_y,
-                        );
-
-                        if correlation > best_correlation {
-                            best_correlation = correlation;
-                            best_shift_x = shift_x;
-                            best_shift_y = shift_y;
-                        }
-                    }
+                if correlation > best_correlation {
+                    best_correlation = correlation;
+                    best_shift_x = sx as f64;
+                    best_shift_y = sy as f64;
                 }
             }
         }
 
-        (best_shift_x, best_shift_y, best_correlation)
+        let mut step = 1.0 / 3.0;
+        for _ in 0..2 {
+            let (centre_x, centre_y) = (best_shift_x, best_shift_y);
+
+            for dy in -1..=1 {
+                for dx in -1..=1 {
+                    if dx == 0 && dy == 0 {
+                        continue;
+                    }
+
+                    let shift_x = centre_x + dx as f64 * step;
+                    let shift_y = centre_y + dy as f64 * step;
+
+                    let correlation = self.calculate_edge_correlation(
+                        channel,
+                        reference,
+                        edge_points,
+                        shift_x,
+                        shift_y,
+                    );
+
+                    if correlation > best_correlation {
+                        best_correlation = correlation;
+                        best_shift_x = shift_x;
+                        best_shift_y = shift_y;
+                    }
+                }
+            }
+
+            step /= 3.0;
+        }
+
+        (best_shift_x, best_shift_y, best_correlation.max(0.0))
     }
 
+    /// Zero-mean normalised cross-correlation at the given shift.
+    ///
+    /// The previous form omitted the mean subtraction, making it a cosine
+    /// similarity between two all-positive intensity vectors. That sits near
+    /// 1.0 for every candidate shift, so the arg-max it fed was effectively
+    /// noise and the reported aberration vectors were meaningless.
     fn calculate_edge_correlation(
         &self,
         channel: &GrayImage,
@@ -307,36 +319,52 @@ impl ChromaticAberrationAnalyzer {
         shift_y: f64,
     ) -> f64 {
         let (width, height) = reference.dimensions();
-        let mut sum_product = 0.0;
-        let mut sum_ref_sq = 0.0;
-        let mut sum_ch_sq = 0.0;
-        let mut count = 0;
+
+        let mut reference_values = Vec::with_capacity(edge_points.len());
+        let mut channel_values = Vec::with_capacity(edge_points.len());
 
         for &(x, y, _, _) in edge_points {
-            let ref_val = reference.get_pixel(x, y)[0] as f64;
-
             let shifted_x = x as f64 + shift_x;
             let shifted_y = y as f64 + shift_y;
 
-            if shifted_x >= 0.0
-                && shifted_x < (width - 1) as f64
-                && shifted_y >= 0.0
-                && shifted_y < (height - 1) as f64
+            if shifted_x < 0.0
+                || shifted_x >= (width - 1) as f64
+                || shifted_y < 0.0
+                || shifted_y >= (height - 1) as f64
             {
-                let ch_val = self.bilinear_sample(channel, shifted_x, shifted_y);
-
-                sum_product += ref_val * ch_val;
-                sum_ref_sq += ref_val * ref_val;
-                sum_ch_sq += ch_val * ch_val;
-                count += 1;
+                continue;
             }
+
+            reference_values.push(reference.get_pixel(x, y)[0] as f64);
+            channel_values.push(self.bilinear_sample(channel, shifted_x, shifted_y));
         }
 
-        if count == 0 || sum_ref_sq == 0.0 || sum_ch_sq == 0.0 {
+        if reference_values.len() < 4 {
             return 0.0;
         }
 
-        sum_product / (sum_ref_sq.sqrt() * sum_ch_sq.sqrt())
+        let n = reference_values.len() as f64;
+        let ref_mean = reference_values.iter().sum::<f64>() / n;
+        let ch_mean = channel_values.iter().sum::<f64>() / n;
+
+        let mut covariance = 0.0;
+        let mut ref_variance = 0.0;
+        let mut ch_variance = 0.0;
+
+        for (&r, &c) in reference_values.iter().zip(channel_values.iter()) {
+            let dr = r - ref_mean;
+            let dc = c - ch_mean;
+            covariance += dr * dc;
+            ref_variance += dr * dr;
+            ch_variance += dc * dc;
+        }
+
+        let denominator = (ref_variance * ch_variance).sqrt();
+        if denominator < 1e-10 {
+            0.0
+        } else {
+            covariance / denominator
+        }
     }
 
     fn bilinear_sample(&self, image: &GrayImage, x: f64, y: f64) -> f64 {
@@ -361,7 +389,7 @@ impl ChromaticAberrationAnalyzer {
             + v11 * fx * fy
     }
 
-    fn create_abberation_map(
+    fn create_aberration_map(
         &self,
         width: u32,
         height: u32,
@@ -410,13 +438,43 @@ impl ChromaticAberrationAnalyzer {
             return None;
         }
 
-        let center_x = width as f64 / 2.0;
-        let center_y = height as f64 / 2.0;
+        // A *displaced* optical centre is the forensic signal here: splicing
+        // breaks the radial symmetry of lens aberration. Pinning the centre to
+        // the middle of the frame, as this previously did, meant the model
+        // could not detect the very thing it reports.
+        let mut best: Option<RadialAberrationModel> = None;
 
+        let span_x = width as f64;
+        let span_y = height as f64;
+
+        for grid_y in 0..5 {
+            for grid_x in 0..5 {
+                let center_x = span_x * (0.3 + 0.1 * grid_x as f64);
+                let center_y = span_y * (0.3 + 0.1 * grid_y as f64);
+
+                if let Some(model) = self.fit_at_center(measurements, center_x, center_y)
+                    && best
+                        .as_ref()
+                        .is_none_or(|current| model.fit_quality > current.fit_quality)
+                {
+                    best = Some(model);
+                }
+            }
+        }
+
+        best
+    }
+
+    /// Least-squares radial coefficients for a fixed optical centre.
+    fn fit_at_center(
+        &self,
+        measurements: &[AberrationMeasurement],
+        center_x: f64,
+        center_y: f64,
+    ) -> Option<RadialAberrationModel> {
         let mut sum_r_sq = 0.0;
         let mut sum_r_shift_red = 0.0;
         let mut sum_r_shift_blue = 0.0;
-        let mut count = 0.0;
 
         for m in measurements {
             let dx = m.x as f64 - center_x;
@@ -436,7 +494,6 @@ impl ChromaticAberrationAnalyzer {
             sum_r_sq += r * r * m.confidence;
             sum_r_shift_red += r * rg_radial * m.confidence;
             sum_r_shift_blue += r * bg_radial * m.confidence;
-            count += m.confidence;
         }
 
         if sum_r_sq < 1e-10 {
@@ -445,7 +502,6 @@ impl ChromaticAberrationAnalyzer {
 
         let k_red = sum_r_shift_red / sum_r_sq;
         let k_blue = sum_r_shift_blue / sum_r_sq;
-
         let fit_quality = self.calculate_model_fit(measurements, center_x, center_y, k_red, k_blue);
 
         Some(RadialAberrationModel {
@@ -469,10 +525,11 @@ impl ChromaticAberrationAnalyzer {
             return 0.0;
         }
 
-        let mean_rg_x =
-            measurements.iter().map(|m| m.rg_shift_x).sum::<f64>() / measurements.len() as f64;
-        let mean_rg_y =
-            measurements.iter().map(|m| m.rg_shift_y).sum::<f64>() / measurements.len() as f64;
+        let count = measurements.len() as f64;
+        let mean_rg_x = measurements.iter().map(|m| m.rg_shift_x).sum::<f64>() / count;
+        let mean_rg_y = measurements.iter().map(|m| m.rg_shift_y).sum::<f64>() / count;
+        let mean_bg_x = measurements.iter().map(|m| m.bg_shift_x).sum::<f64>() / count;
+        let mean_bg_y = measurements.iter().map(|m| m.bg_shift_y).sum::<f64>() / count;
 
         let mut ss_res = 0.0;
         let mut ss_tot = 0.0;
@@ -491,10 +548,19 @@ impl ChromaticAberrationAnalyzer {
 
             let expected_rg_x = k_red * r * radial_dir_x;
             let expected_rg_y = k_red * r * radial_dir_y;
+            let expected_bg_x = k_blue * r * radial_dir_x;
+            let expected_bg_y = k_blue * r * radial_dir_y;
 
-            ss_res +=
-                (m.rg_shift_x - expected_rg_x).powi(2) + (m.rg_shift_y - expected_rg_y).powi(2);
-            ss_tot += (m.rg_shift_x - mean_rg_x).powi(2) + (m.rg_shift_y - mean_rg_y).powi(2);
+            // Both channels contribute; `k_blue` was previously computed and
+            // then left out of the residual entirely.
+            ss_res += (m.rg_shift_x - expected_rg_x).powi(2)
+                + (m.rg_shift_y - expected_rg_y).powi(2)
+                + (m.bg_shift_x - expected_bg_x).powi(2)
+                + (m.bg_shift_y - expected_bg_y).powi(2);
+            ss_tot += (m.rg_shift_x - mean_rg_x).powi(2)
+                + (m.rg_shift_y - mean_rg_y).powi(2)
+                + (m.bg_shift_x - mean_bg_x).powi(2)
+                + (m.bg_shift_y - mean_bg_y).powi(2);
         }
 
         if ss_tot < 1e-10 {
@@ -575,37 +641,16 @@ impl ChromaticAberrationAnalyzer {
         let block_size = self.config.block_size;
         let threshold = (self.config.inconsistency_threshold * 50.0) as u8;
 
-        let mut regions = Vec::new();
+        clipped_blocks(width, height, block_size, block_size)
+            .filter(|block| {
+                let sum: u64 = block
+                    .pixels()
+                    .map(|(x, y)| inconsistency_map.get_pixel(x, y)[0] as u64)
+                    .sum();
 
-        for by in (0..height).step_by(block_size as usize) {
-            for bx in (0..width).step_by(block_size as usize) {
-                let block_w = block_size.min(width - bx);
-                let block_h = block_size.min(height - by);
-
-                let mut sum = 0u32;
-                let mut count = 0;
-
-                for y in by..(by + block_h) {
-                    for x in bx..(bx + block_w) {
-                        sum += inconsistency_map.get_pixel(x, y)[0] as u32;
-                        count += 1;
-                    }
-                }
-
-                let avg = (sum / count) as u8;
-
-                if avg > threshold {
-                    regions.push(SRegion {
-                        x: bx,
-                        y: by,
-                        width: block_w,
-                        height: block_h,
-                    });
-                }
-            }
-        }
-
-        regions
+                (sum / block.area()) as u8 > threshold
+            })
+            .collect()
     }
 
     fn create_visualization(
@@ -617,85 +662,43 @@ impl ChromaticAberrationAnalyzer {
         let mut vis = original.clone();
         let scale = 10.0;
 
+        // Shift vectors routinely point left or up. Casting a negative i32
+        // endpoint to u32 wrapped it to ~4e9, and the old Bresenham loop then
+        // marched x upwards forever chasing a target it re-cast as negative:
+        // an infinite loop in release, an overflow panic in debug.
         for m in measurements {
-            let end_x = m.x as i32 + (m.rg_shift_x * scale) as i32;
-            let end_y = m.y as i32 + (m.rg_shift_y * scale) as i32;
-            self.draw_line(
+            let (x, y) = (m.x as i32, m.y as i32);
+
+            draw::line(
                 &mut vis,
-                m.x,
-                m.y,
-                end_x as u32,
-                end_y as u32,
+                x,
+                y,
+                x + (m.rg_shift_x * scale).round() as i32,
+                y + (m.rg_shift_y * scale).round() as i32,
                 Rgb([255, 0, 0]),
             );
 
-            let end_x = m.x as i32 + (m.bg_shift_x * scale) as i32;
-            let end_y = m.y as i32 + (m.bg_shift_y * scale) as i32;
-            self.draw_line(
+            draw::line(
                 &mut vis,
-                m.x,
-                m.y,
-                end_x as u32,
-                end_y as u32,
+                x,
+                y,
+                x + (m.bg_shift_x * scale).round() as i32,
+                y + (m.bg_shift_y * scale).round() as i32,
                 Rgb([0, 0, 255]),
             );
         }
 
         if let Some(model) = model {
-            let cx = model.center_x as u32;
-            let cy = model.center_y as u32;
-            let (width, height) = vis.dimensions();
-
-            for d in 0..20 {
-                if cx + d < width {
-                    vis.put_pixel(cx + d, cy, Rgb([255, 255, 0]));
-                }
-                if cx >= d {
-                    vis.put_pixel(cx - d, cy, Rgb([255, 255, 0]));
-                }
-                if cy + d < height {
-                    vis.put_pixel(cx, cy + d, Rgb([255, 255, 0]));
-                }
-                if cy >= d {
-                    vis.put_pixel(cx, cy - d, Rgb([255, 255, 0]));
-                }
-            }
+            draw::crosshair(
+                &mut vis,
+                model.center_x.round() as i32,
+                model.center_y.round() as i32,
+                20,
+                Rgb([255, 255, 0]),
+            );
         }
 
         vis
-    }
-
-    fn draw_line(&self, image: &mut RgbImage, x0: u32, y0: u32, x1: u32, y1: u32, color: Rgb<u8>) {
-        let (width, height) = image.dimensions();
-
-        let dx = (x1 as i32 - x0 as i32).abs();
-        let dy = -(y1 as i32 - y0 as i32).abs();
-        let sx = if x0 < x1 { 1i32 } else { -1i32 };
-        let sy = if y0 < y1 { 1i32 } else { -1i32 };
-        let mut err = dx + dy;
-
-        let mut x = x0 as i32;
-        let mut y = y0 as i32;
-
-        loop {
-            if x >= 0 && x < width as i32 && y >= 0 && y < height as i32 {
-                image.put_pixel(x as u32, y as u32, color);
-            }
-
-            if x == x1 as i32 && y == y1 as i32 {
-                break;
-            }
-
-            let e2 = 2 * err;
-            if e2 >= dy {
-                err += dy;
-                x += sx;
-            }
-            if e2 <= dx {
-                err += dx;
-                y += sy;
-            }
-        }
     }
 
     fn calculate_consistency_score(
@@ -725,9 +728,7 @@ impl ChromaticAberrationAnalyzer {
 
             if total_weight > 0.0 {
                 let avg_error = total_error / total_weight;
-                (1.0 - avg_error / self.config.max_aberration)
-                    .max(0.0)
-                    .min(1.0)
+                (1.0 - avg_error / self.config.max_aberration).clamp(0.0, 1.0)
             } else {
                 1.0
             }
@@ -741,9 +742,7 @@ impl ChromaticAberrationAnalyzer {
                 shifts.iter().map(|s| (s - mean).powi(2)).sum::<f64>() / shifts.len() as f64;
             let std_dev = variance.sqrt();
 
-            (1.0 - std_dev / self.config.max_aberration)
-                .max(0.0)
-                .min(1.0)
+            (1.0 - std_dev / self.config.max_aberration).clamp(0.0, 1.0)
         }
     }
 
@@ -754,23 +753,116 @@ impl ChromaticAberrationAnalyzer {
         width: u32,
         height: u32,
     ) -> f64 {
-        let total_pixels = (width * height) as f64;
+        let total_pixels = width as f64 * height as f64;
+        let inconsistent_pixels: u64 = inconsistent_regions.iter().map(|r| r.area()).sum();
 
-        let inconsistent_pixels = inconsistent_regions
-            .iter()
-            .map(|r| r.width * r.height)
-            .sum::<u32>();
+        let coverage = if total_pixels > 0.0 {
+            inconsistent_pixels as f64 / total_pixels
+        } else {
+            0.0
+        };
 
-        let coverage = inconsistent_pixels as f64 / total_pixels;
-
-        let prob = coverage * 0.4 + (1.0 - consistency_score) * 0.6;
-
-        prob.min(1.0)
+        (coverage * 0.4 + (1.0 - consistency_score) * 0.6).clamp(0.0, 1.0)
     }
 }
 
 impl Default for ChromaticAberrationAnalyzer {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Colour edges with a deliberate one-pixel red/blue fringe.
+    fn fringed_edges(width: u32, height: u32) -> DynamicImage {
+        let mut image = RgbImage::new(width, height);
+
+        for (x, y, pixel) in image.enumerate_pixels_mut() {
+            let base = if (x / 16 + y / 16) % 2 == 0 { 210u8 } else { 45 };
+            let shifted = if ((x + 1) / 16 + y / 16) % 2 == 0 { 210u8 } else { 45 };
+            *pixel = Rgb([shifted, base, base]);
+        }
+
+        DynamicImage::ImageRgb8(image)
+    }
+
+    #[test]
+    fn visualization_terminates_with_leftward_shifts() {
+        // Any measurement pointing left or up used to wrap through u32 and hang
+        // the Bresenham loop. Draw directly to pin the regression.
+        let analyzer = ChromaticAberrationAnalyzer::new();
+        let original = RgbImage::new(64, 64);
+
+        let measurements = vec![AberrationMeasurement {
+            x: 2,
+            y: 2,
+            rg_shift_x: -40.0,
+            rg_shift_y: -40.0,
+            bg_shift_x: -40.0,
+            bg_shift_y: 40.0,
+            confidence: 1.0,
+        }];
+
+        let vis = analyzer.create_visualization(&original, &measurements, None);
+        assert_eq!(vis.dimensions(), (64, 64));
+    }
+
+    #[test]
+    fn correlation_is_bounded_and_peaks_at_zero_shift() {
+        let analyzer = ChromaticAberrationAnalyzer::new();
+        let mut channel = GrayImage::new(32, 32);
+        for (x, _, pixel) in channel.enumerate_pixels_mut() {
+            *pixel = Luma([if x < 16 { 20 } else { 200 }]);
+        }
+
+        let edge_points: Vec<(u32, u32, f64, f64)> =
+            (12..20).flat_map(|x| (8..24).map(move |y| (x, y, 0.0, 0.0))).collect();
+
+        let aligned = analyzer.calculate_edge_correlation(&channel, &channel, &edge_points, 0.0, 0.0);
+        let offset = analyzer.calculate_edge_correlation(&channel, &channel, &edge_points, 3.0, 0.0);
+
+        assert!(aligned <= 1.0 + 1e-9, "correlation {aligned} exceeds 1");
+        assert!(
+            aligned > offset,
+            "aligned {aligned} did not beat offset {offset}"
+        );
+    }
+
+    #[test]
+    fn undersized_images_error() {
+        let image = DynamicImage::ImageRgb8(RgbImage::new(64, 64));
+        assert!(ChromaticAberrationAnalyzer::new().analyze(&image).is_err());
+    }
+
+    #[test]
+    fn analysis_outputs_are_bounded() {
+        let result = ChromaticAberrationAnalyzer::new()
+            .analyze(&fringed_edges(256, 192))
+            .unwrap();
+
+        assert!((0.0..=1.0).contains(&result.manipulation_probability));
+        assert!((0.0..=1.0).contains(&result.consistency_score));
+        assert_eq!(result.visualization.dimensions(), (256, 192));
+
+        for region in &result.inconsistent_regions {
+            assert!(region.right() <= 256);
+            assert!(region.bottom() <= 192);
+        }
+    }
+
+    #[test]
+    fn optical_center_is_searched_not_assumed() {
+        let result = ChromaticAberrationAnalyzer::new()
+            .analyze(&fringed_edges(256, 256))
+            .unwrap();
+
+        if let Some((cx, cy)) = result.optical_center {
+            // Inside the frame, but not hard-wired to the exact middle.
+            assert!((0.0..=256.0).contains(&cx));
+            assert!((0.0..=256.0).contains(&cy));
+        }
     }
 }

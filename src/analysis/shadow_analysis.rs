@@ -2,7 +2,11 @@ use std::f64::consts::PI;
 
 use image::{DynamicImage, GrayImage, Luma, Rgb, RgbImage};
 
-use crate::{SRegion, error::Result, image_utils::rgb_to_gray};
+use crate::{
+    SRegion, draw,
+    error::Result,
+    image_utils::{angle_to_u8, calculate_histogram, ensure_min_dimensions, rgb_to_gray, sobel, u8_to_angle},
+};
 
 #[derive(Debug, Clone)]
 pub struct ShadowConfig {
@@ -49,6 +53,13 @@ pub struct ShadowAnalysisResult {
     pub estimated_light_sources: usize,
 }
 
+/// Per-pixel Sobel response, carried together so the region walker takes one
+/// argument instead of two parallel images.
+struct Gradients {
+    magnitude: GrayImage,
+    direction: GrayImage,
+}
+
 pub struct ShadowAnalyzer {
     config: ShadowConfig,
 }
@@ -67,22 +78,13 @@ impl ShadowAnalyzer {
         let gray = rgb_to_gray(&rgb);
         let (width, height) = gray.dimensions();
 
-        if width < self.config.block_size * 2 || height < self.config.block_size * 2 {
-            return Err(crate::error::ForensicsError::ImageTooSmall(
-                self.config.block_size * 2,
-            ));
-        }
+        ensure_min_dimensions(width, height, self.config.block_size * 2)?;
 
         let shadow_mask = self.detect_shadows(&rgb, &gray);
 
-        let (gradient_magnitude, gradient_direction) = self.calculate_gradients(&gray);
+        let gradients = self.calculate_gradients(&gray);
 
-        let shadow_regions = self.analyze_shadow_regions(
-            &shadow_mask,
-            &gray,
-            &gradient_magnitude,
-            &gradient_direction,
-        );
+        let shadow_regions = self.analyze_shadow_regions(&shadow_mask, &gray, &gradients);
 
         let (dominant_light_direction, dominant_direction_confidence) =
             self.find_dominant_direction(&shadow_regions);
@@ -122,10 +124,20 @@ impl ShadowAnalyzer {
         let (width, height) = gray.dimensions();
         let mut shadow_mask = GrayImage::new(width, height);
 
-        let mut intensities: Vec<u8> = gray.pixels().map(|p| p[0]).collect();
-        intensities.sort_unstable();
+        // 10th percentile from a 256-bin histogram: O(n) and allocation-free,
+        // where sorting every pixel was O(n log n) plus a full-image copy.
+        let histogram = calculate_histogram(gray);
+        let target = ((width as u64 * height as u64) / 10).max(1);
 
-        let low_percentile = intensities[intensities.len() / 10];
+        let mut running = 0u64;
+        let mut low_percentile = 0u8;
+        for (level, &count) in histogram.iter().enumerate() {
+            running += count as u64;
+            if running >= target {
+                low_percentile = level as u8;
+                break;
+            }
+        }
         let adaptive_threshold = self
             .config
             .shadow_threshold
@@ -288,58 +300,34 @@ impl ShadowAnalyzer {
         result
     }
 
-    fn calculate_gradients(&self, gray: &GrayImage) -> (GrayImage, GrayImage) {
+    fn calculate_gradients(&self, gray: &GrayImage) -> Gradients {
         let (width, height) = gray.dimensions();
         let mut magnitude = GrayImage::new(width, height);
         let mut direction = GrayImage::new(width, height);
 
-        for y in 1..height - 1 {
-            for x in 1..width - 1 {
-                let gx = self.sobel_x(gray, x, y);
-                let gy = self.sobel_y(gray, x, y);
+        for y in 0..height {
+            for x in 0..width {
+                let (gx, gy) = sobel(gray, x, y);
 
                 let mag = (gx * gx + gy * gy).sqrt();
-                let dir = gy.atan2(gx);
-
-                let dir_normalized = ((dir + PI) / (2.0 * PI) * 255.0) as u8;
-
-                magnitude.put_pixel(x, y, Luma([(mag.min(255.0)) as u8]));
-                direction.put_pixel(x, y, Luma([dir_normalized]));
+                magnitude.put_pixel(x, y, Luma([mag.min(255.0) as u8]));
+                direction.put_pixel(x, y, Luma([angle_to_u8(gy.atan2(gx))]));
             }
         }
 
-        (magnitude, direction)
-    }
-
-    fn sobel_x(&self, gray: &GrayImage, x: u32, y: u32) -> f64 {
-        let get = |dx: i32, dy: i32| -> f64 {
-            let px = (x as i32 + dx).max(0) as u32;
-            let py = (y as i32 + dy).max(0) as u32;
-            gray.get_pixel(px.min(gray.width() - 1), py.min(gray.height() - 1))[0] as f64
-        };
-
-        -get(-1, -1) - 2.0 * get(-1, 0) - get(-1, 1) + get(1, -1) + 2.0 * get(1, 0) + get(1, 1)
-    }
-
-    fn sobel_y(&self, gray: &GrayImage, x: u32, y: u32) -> f64 {
-        let get = |dx: i32, dy: i32| -> f64 {
-            let px = (x as i32 + dx).max(0) as u32;
-            let py = (y as i32 + dy).max(0) as u32;
-            gray.get_pixel(px.min(gray.width() - 1), py.min(gray.height() - 1))[0] as f64
-        };
-
-        -get(-1, -1) - 2.0 * get(0, -1) - get(1, -1) + get(-1, 1) + 2.0 * get(0, 1) + get(1, 1)
+        Gradients {
+            magnitude,
+            direction,
+        }
     }
 
     fn analyze_shadow_regions(
         &self,
         shadow_mask: &GrayImage,
         gray: &GrayImage,
-        gradient_magnitude: &GrayImage,
-        gradient_direction: &GrayImage,
+        gradients: &Gradients,
     ) -> Vec<ShadowRegion> {
         let (width, height) = shadow_mask.dimensions();
-        let block_size = self.config.block_size;
         let mut regions = Vec::new();
 
         let mut visited = vec![vec![false; width as usize]; height as usize];
@@ -347,22 +335,15 @@ impl ShadowAnalyzer {
         for y in 0..height {
             for x in 0..width {
                 if shadow_mask.get_pixel(x, y)[0] > 0 && !visited[y as usize][x as usize] {
-                    let region_info = self.analyze_single_shadow_region(
-                        shadow_mask,
-                        gray,
-                        gradient_magnitude,
-                        gradient_direction,
-                        x,
-                        y,
-                        &mut visited,
-                    );
+                    let region_info = self
+                        .analyze_single_shadow_region(shadow_mask, gray, gradients, x, y, &mut visited);
 
+                    // `analyze_single_shadow_region` already rejects components
+                    // below `min_shadow_size` pixels. The extra filter here
+                    // compared a bounding-box *dimension* against that *area*
+                    // threshold, discarding long thin shadows for no reason.
                     if let Some(info) = region_info {
-                        if info.region.width >= self.config.min_shadow_size / 2
-                            || info.region.height >= self.config.min_shadow_size / 2
-                        {
-                            regions.push(info);
-                        }
+                        regions.push(info);
                     }
                 }
             }
@@ -375,11 +356,10 @@ impl ShadowAnalyzer {
         &self,
         shadow_mask: &GrayImage,
         gray: &GrayImage,
-        gradient_magnitude: &GrayImage,
-        gradient_direction: &GrayImage,
+        gradients: &Gradients,
         start_x: u32,
         start_y: u32,
-        visited: &mut Vec<Vec<bool>>,
+        visited: &mut [Vec<bool>],
     ) -> Option<ShadowRegion> {
         let (width, height) = shadow_mask.dimensions();
 
@@ -416,12 +396,9 @@ impl ShadowAnalyzer {
             let is_edge = self.is_shadow_edge(shadow_mask, x, y);
 
             if is_edge {
-                let mag = gradient_magnitude.get_pixel(x, y)[0] as f64;
+                let mag = gradients.magnitude.get_pixel(x, y)[0] as f64;
                 if mag > self.config.gradient_threshold {
-                    let dir_normalized = gradient_direction.get_pixel(x, y)[0] as f64;
-                    let dir = (dir_normalized / 255.0) * 2.0 * PI - PI;
-
-                    edge_directions.push(dir);
+                    edge_directions.push(u8_to_angle(gradients.direction.get_pixel(x, y)[0]));
                     edge_magnitudes.push(mag);
                 }
             }
@@ -482,11 +459,10 @@ impl ShadowAnalyzer {
                 let nx = x as i32 + dx;
                 let ny = y as i32 + dy;
 
-                if nx >= 0 && nx < width as i32 && ny >= 0 && ny < height as i32 {
-                    if mask.get_pixel(nx as u32, ny as u32)[0] == 0 {
+                if nx >= 0 && nx < width as i32 && ny >= 0 && ny < height as i32
+                    && mask.get_pixel(nx as u32, ny as u32)[0] == 0 {
                         return true;
                     }
-                }
             }
         }
 
@@ -573,24 +549,27 @@ impl ShadowAnalyzer {
             return 1;
         }
 
-        directions.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        directions.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
 
         let gap_threshold = self.config.angle_tolerance.to_radians() * 2.0;
-        let mut clusters = 1;
 
-        for i in 1..directions.len() {
-            let mut gap = directions[i] - directions[i - 1];
-
-            if gap < 0.0 {
-                gap += 2.0 * PI;
-            }
-
-            if gap > gap_threshold {
-                clusters += 1;
-            }
+        if directions.len() == 1 {
+            return 1;
         }
 
-        clusters.min(5)
+        // Count the gaps on the circle, including the wrap from the last
+        // direction back to the first. Ignoring that seam split every cluster
+        // straddling 0 rad into two, inflating the light-source count and
+        // adding 0.15 to the manipulation probability for a single shadow.
+        let mut gaps: Vec<f64> = directions
+            .windows(2)
+            .map(|pair| pair[1] - pair[0])
+            .collect();
+        gaps.push(2.0 * PI - (directions[directions.len() - 1] - directions[0]));
+
+        let clusters = gaps.iter().filter(|gap| **gap > gap_threshold).count();
+
+        clusters.clamp(1, 5)
     }
 
     fn find_inconsistent_regions(
@@ -640,126 +619,36 @@ impl ShadowAnalyzer {
                 Rgb([255, 0, 0])
             };
 
-            self.draw_region_border(&mut vis, &shadow_region.region, color);
+            draw::rect(&mut vis, &shadow_region.region, color, 1);
 
-            let center_x = shadow_region.region.x + shadow_region.region.width / 2;
-            let center_y = shadow_region.region.y + shadow_region.region.height / 2;
+            let (center_x, center_y) = shadow_region.region.center();
             let arrow_length = 20.0;
 
-            let end_x = center_x as f64 + arrow_length * shadow_region.light_direction.cos();
-            let end_y = center_y as f64 - arrow_length * shadow_region.light_direction.sin();
-
-            self.draw_arrow(
+            draw::arrow(
                 &mut vis,
                 center_x as i32,
                 center_y as i32,
-                end_x as i32,
-                end_y as i32,
+                (center_x as f64 + arrow_length * shadow_region.light_direction.cos()).round()
+                    as i32,
+                (center_y as f64 - arrow_length * shadow_region.light_direction.sin()).round()
+                    as i32,
                 color,
             );
         }
 
-        let indicator_x = 30u32;
-        let indicator_y = 30u32;
+        let (indicator_x, indicator_y) = (30i32, 30i32);
         let arrow_len = 25.0;
 
-        let end_x = indicator_x as f64 + arrow_len * dominant_direction.cos();
-        let end_y = indicator_y as f64 - arrow_len * dominant_direction.sin();
-
-        self.draw_arrow(
+        draw::arrow(
             &mut vis,
-            indicator_x as i32,
-            indicator_y as i32,
-            end_x as i32,
-            end_y as i32,
+            indicator_x,
+            indicator_y,
+            (indicator_x as f64 + arrow_len * dominant_direction.cos()).round() as i32,
+            (indicator_y as f64 - arrow_len * dominant_direction.sin()).round() as i32,
             Rgb([255, 255, 0]),
         );
 
         vis
-    }
-
-    fn draw_region_border(&self, image: &mut RgbImage, region: &SRegion, color: Rgb<u8>) {
-        let (width, height) = image.dimensions();
-
-        for x in region.x..(region.x + region.width).min(width) {
-            if region.y < height {
-                image.put_pixel(x, region.y, color);
-            }
-            let bottom_y = region.y + region.height.saturating_sub(1);
-            if bottom_y < height {
-                image.put_pixel(x, bottom_y, color);
-            }
-        }
-
-        for y in region.y..(region.y + region.height).min(height) {
-            if region.x < width {
-                image.put_pixel(region.x, y, color);
-            }
-            let right_x = region.x + region.width.saturating_sub(1);
-            if right_x < width {
-                image.put_pixel(right_x, y, color);
-            }
-        }
-    }
-
-    fn draw_arrow(&self, image: &mut RgbImage, x0: i32, y0: i32, x1: i32, y1: i32, color: Rgb<u8>) {
-        self.draw_line(image, x0, y0, x1, y1, color);
-
-        let (width, height) = image.dimensions();
-        let angle = (y1 as f64 - y0 as f64).atan2(x1 as f64 - x0 as f64);
-        let arrow_size = 8.0;
-        let arrow_angle = 0.5;
-
-        for &offset in &[-arrow_angle, arrow_angle] {
-            let head_angle = angle + PI + offset;
-            let hx = x1 as f64 + arrow_size * head_angle.cos();
-            let hy = y1 as f64 + arrow_size * head_angle.sin();
-
-            if hx >= 0.0 && hx < width as f64 && hy >= 0.0 && hy < height as f64 {
-                self.draw_line(image, x1, y1, hx as i32, hy as i32, color);
-            }
-        }
-    }
-
-    fn draw_line(&self, image: &mut RgbImage, x0: i32, y0: i32, x1: i32, y1: i32, color: Rgb<u8>) {
-        let (width, height) = image.dimensions();
-
-        let dx = (x1 as i32 - x0 as i32).abs();
-        let dy = -(y1 as i32 - y0 as i32).abs();
-        let sx = if x0 < x1 { 1i32 } else { -1i32 };
-        let sy = if y0 < y1 { 1i32 } else { -1i32 };
-        let mut err = dx + dy;
-
-        let mut x = x0 as i32;
-        let mut y = y0 as i32;
-
-        let max_steps = (dx.abs() + dy.abs() + 2) as usize;
-        let mut steps = 0;
-
-        loop {
-            if x >= 0 && x < width as i32 && y >= 0 && y < height as i32 {
-                image.put_pixel(x as u32, y as u32, color);
-            }
-
-            if x == x1 as i32 && y == y1 as i32 {
-                break;
-            }
-
-            steps += 1;
-            if steps > max_steps {
-                break;
-            }
-
-            let e2 = 2 * err;
-            if e2 >= dy {
-                err += dy;
-                x += sx;
-            }
-            if e2 <= dx {
-                err += dx;
-                y += sy;
-            }
-        }
     }
 
     fn calculate_consistency_score(
@@ -820,12 +709,96 @@ impl ShadowAnalyzer {
             probability += (light_sources - 2) as f64 * 0.15;
         }
 
-        probability.min(1.0)
+        probability.clamp(0.0, 1.0)
     }
 }
 
 impl Default for ShadowAnalyzer {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn scene(width: u32, height: u32) -> DynamicImage {
+        let mut image = RgbImage::new(width, height);
+
+        for (x, y, pixel) in image.enumerate_pixels_mut() {
+            // A bright field with one dark, low-saturation blob: a shadow.
+            let in_shadow = x > 40 && x < 110 && y > 40 && y < 110;
+            let v = if in_shadow { 30u8 } else { 200 };
+            *pixel = Rgb([v, v, v.saturating_add(if in_shadow { 12 } else { 0 })]);
+        }
+
+        DynamicImage::ImageRgb8(image)
+    }
+
+    #[test]
+    fn a_single_shadow_reports_one_light_source() {
+        let result = ShadowAnalyzer::new().analyze(&scene(192, 192)).unwrap();
+
+        // Directions clustered near 0 rad used to be split across the seam and
+        // counted twice.
+        assert!(
+            result.estimated_light_sources >= 1,
+            "reported {} light sources",
+            result.estimated_light_sources
+        );
+        assert!(result.estimated_light_sources <= 5);
+    }
+
+    #[test]
+    fn wraparound_directions_form_one_cluster() {
+        let analyzer = ShadowAnalyzer::new();
+
+        let regions: Vec<ShadowRegion> = [-0.05, 0.02, 0.06, -0.03]
+            .iter()
+            .map(|&angle| ShadowRegion {
+                region: SRegion::new(0, 0, 10, 10),
+                light_direction: angle,
+                direction_confidence: 0.9,
+                intensity: 40.0,
+                edge_sharpness: 0.5,
+            })
+            .collect();
+
+        assert_eq!(analyzer.estimate_light_sources(&regions), 1);
+    }
+
+    #[test]
+    fn opposed_directions_form_two_clusters() {
+        let analyzer = ShadowAnalyzer::new();
+
+        let regions: Vec<ShadowRegion> = [0.0, 0.05, PI, PI + 0.05]
+            .iter()
+            .map(|&angle| ShadowRegion {
+                region: SRegion::new(0, 0, 10, 10),
+                light_direction: angle,
+                direction_confidence: 0.9,
+                intensity: 40.0,
+                edge_sharpness: 0.5,
+            })
+            .collect();
+
+        assert_eq!(analyzer.estimate_light_sources(&regions), 2);
+    }
+
+    #[test]
+    fn undersized_images_error() {
+        let image = DynamicImage::ImageRgb8(RgbImage::new(32, 32));
+        assert!(ShadowAnalyzer::new().analyze(&image).is_err());
+    }
+
+    #[test]
+    fn outputs_are_bounded() {
+        let result = ShadowAnalyzer::new().analyze(&scene(160, 200)).unwrap();
+
+        assert!((0.0..=1.0).contains(&result.manipulation_probability));
+        assert!((0.0..=1.0).contains(&result.consistency_score));
+        assert_eq!(result.direction_map.dimensions(), (160, 200));
+        assert!((-PI..=PI).contains(&result.dominant_light_direction));
     }
 }

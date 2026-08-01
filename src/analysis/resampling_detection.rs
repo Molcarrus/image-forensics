@@ -2,7 +2,11 @@ use std::f64::consts::PI;
 
 use image::{DynamicImage, GrayImage, Luma};
 
-use crate::{SRegion, error::Result, image_utils::rgb_to_gray};
+use crate::{
+    SRegion,
+    error::Result,
+    image_utils::{clipped_blocks, ensure_min_dimensions, full_blocks, rgb_to_gray},
+};
 
 #[derive(Debug, Clone)]
 pub struct ResamplingConfig {
@@ -59,11 +63,7 @@ impl ResamplingDetector {
         let gray = rgb_to_gray(&image.to_rgb8());
         let (width, height) = gray.dimensions();
 
-        if width < self.config.block_size * 2 || height < self.config.block_size * 2 {
-            return Err(crate::error::ForensicsError::ImageTooSmall(
-                self.config.block_size * 2,
-            ));
-        }
+        ensure_min_dimensions(width, height, self.config.block_size * 2)?;
 
         let p_map = self.compute_p_map(&gray);
 
@@ -96,6 +96,10 @@ impl ResamplingDetector {
         let (width, height) = gray.dimensions();
         let mut p_map = GrayImage::new(width, height);
 
+        if width < 3 || height < 3 {
+            return p_map;
+        }
+
         for y in 1..height - 1 {
             for x in 1..width - 1 {
                 let d2x = gray.get_pixel(x - 1, y)[0] as f64 - 2.0 * gray.get_pixel(x, y)[0] as f64
@@ -119,26 +123,24 @@ impl ResamplingDetector {
         let mut patterns = Vec::new();
 
         let h_autocorr = self.compute_autocorrelation(p_map, true);
-        if let Some((period, strength)) = self.find_period(&h_autocorr) {
-            if strength > self.config.threshold {
+        if let Some((period, strength)) = self.find_period(&h_autocorr)
+            && strength > self.config.threshold {
                 patterns.push(PeriodicPattern {
                     period,
                     strength,
                     direction: 0.0,
                 });
             }
-        }
 
         let v_autocorr = self.compute_autocorrelation(p_map, false);
-        if let Some((period, strength)) = self.find_period(&v_autocorr) {
-            if strength > self.config.threshold {
+        if let Some((period, strength)) = self.find_period(&v_autocorr)
+            && strength > self.config.threshold {
                 patterns.push(PeriodicPattern {
                     period,
                     strength,
                     direction: PI / 2.0,
                 });
             }
-        }
 
         patterns
     }
@@ -217,12 +219,11 @@ impl ResamplingDetector {
         let mut best_period = 0.0;
 
         for i in 2..autocorr.len() - 1 {
-            if autocorr[i] > autocorr[i - 1] && autocorr[i] > autocorr[i + 1] {
-                if autocorr[i] > best_peak {
+            if autocorr[i] > autocorr[i - 1] && autocorr[i] > autocorr[i + 1]
+                && autocorr[i] > best_peak {
                     best_peak = autocorr[i];
                     best_period = i as f64;
                 }
-            }
         }
 
         if best_peak > 0.1 {
@@ -232,18 +233,35 @@ impl ResamplingDetector {
         }
     }
 
+    /// Recover the scaling factor implied by the strongest periodic peak.
+    ///
+    /// For a resampling by `p/q` the interpolation residual repeats every `q`
+    /// output samples, so a period of `q` corresponds to a factor of
+    /// `q / (q - 1)` for upsampling and its reciprocal for downsampling. The
+    /// previous version returned the raw autocorrelation lag as if it were the
+    /// factor, and never consulted `min_factor`/`max_factor` at all.
     fn estimate_resampling_factor(&self, patterns: &[PeriodicPattern]) -> Option<f64> {
-        if patterns.is_empty() {
+        let best = patterns.iter().max_by(|a, b| {
+            a.strength
+                .partial_cmp(&b.strength)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        })?;
+
+        if best.period < 2.0 {
             return None;
         }
 
-        let best_pattern = patterns
-            .iter()
-            .max_by(|a, b| a.strength.partial_cmp(&b.strength).unwrap())?;
+        let upsample = best.period / (best.period - 1.0);
+        let downsample = 1.0 / upsample;
 
-        let factor = best_pattern.period;
+        // Report whichever interpretation lands inside the configured range.
+        for candidate in [upsample, downsample] {
+            if (self.config.min_factor..=self.config.max_factor).contains(&candidate) {
+                return Some(candidate);
+            }
+        }
 
-        if factor >= 1.0 { Some(factor) } else { None }
+        None
     }
 
     fn create_probability_map(&self, p_map: &GrayImage) -> GrayImage {
@@ -251,17 +269,13 @@ impl ResamplingDetector {
         let block_size = self.config.block_size;
         let mut prob_map = GrayImage::new(width, height);
 
-        for by in (0..height.saturating_sub(block_size)).step_by(block_size as usize / 2) {
-            for bx in (0..width.saturating_sub(block_size)).step_by(block_size as usize / 2) {
-                let local_prob = self.analyze_local_periodicity(p_map, bx, by, block_size);
-                let value = (local_prob * 255.0) as u8;
+        for region in full_blocks(width, height, block_size, (block_size / 2).max(1)) {
+            let local_prob = self.analyze_local_periodicity(p_map, region.x, region.y, block_size);
+            let value = (local_prob * 255.0) as u8;
 
-                for y in by..(by + block_size).min(height) {
-                    for x in bx..(bx + block_size).min(width) {
-                        let existing = prob_map.get_pixel(x, y)[0];
-                        prob_map.put_pixel(x, y, Luma([existing.max(value)]));
-                    }
-                }
+            for (x, y) in region.clamp_to(width, height).pixels() {
+                let existing = prob_map.get_pixel(x, y)[0];
+                prob_map.put_pixel(x, y, Luma([existing.max(value)]));
             }
         }
 
@@ -289,7 +303,7 @@ impl ResamplingDetector {
 
         let max_peak = autocorr.iter().skip(2).cloned().fold(0.0_f64, f64::max);
 
-        max_peak.max(0.0).min(1.0)
+        max_peak.clamp(0.0, 1.0)
     }
 
     fn find_resampled_regions(&self, prob_map: &GrayImage) -> Vec<SRegion> {
@@ -297,37 +311,16 @@ impl ResamplingDetector {
         let block_size = self.config.block_size;
         let threshold = (self.config.threshold * 255.0) as u8;
 
-        let mut regions = Vec::new();
+        clipped_blocks(width, height, block_size, block_size)
+            .filter(|block| {
+                let sum: u64 = block
+                    .pixels()
+                    .map(|(x, y)| prob_map.get_pixel(x, y)[0] as u64)
+                    .sum();
 
-        for by in (0..height).step_by(block_size as usize) {
-            for bx in (0..width).step_by(block_size as usize) {
-                let block_w = block_size.min(width - bx);
-                let block_h = block_size.min(height - by);
-
-                let mut sum = 0u32;
-                let mut count = 0u32;
-
-                for y in by..(by + block_h) {
-                    for x in bx..(bx + block_w) {
-                        sum += prob_map.get_pixel(x, y)[0] as u32;
-                        count += 1;
-                    }
-                }
-
-                let avg = (sum / count) as u8;
-
-                if avg > threshold {
-                    regions.push(SRegion {
-                        x: bx,
-                        y: by,
-                        width: block_w,
-                        height: block_h,
-                    });
-                }
-            }
-        }
-
-        regions
+                (sum / block.area()) as u8 > threshold
+            })
+            .collect()
     }
 
     fn calculate_resampling_probability(
@@ -344,17 +337,75 @@ impl ResamplingDetector {
             probability += max_strength * 0.5;
         }
 
-        let total_pixels = (width * height) as f64;
-        let region_pixels = regions.iter().map(|r| r.width * r.height).sum::<u32>();
-        let coverage = region_pixels as f64 / total_pixels;
-        probability += coverage * 0.5;
+        let total_pixels = width as f64 * height as f64;
+        let region_pixels: u64 = regions.iter().map(|r| r.area()).sum();
 
-        probability.min(1.0)
+        if total_pixels > 0.0 {
+            probability += (region_pixels as f64 / total_pixels) * 0.5;
+        }
+
+        probability.clamp(0.0, 1.0)
     }
 }
 
 impl Default for ResamplingDetector {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use image::{Rgb, RgbImage};
+
+    use super::*;
+
+    fn checkerboard(width: u32, height: u32, cell: u32) -> RgbImage {
+        let mut image = RgbImage::new(width, height);
+        for (x, y, pixel) in image.enumerate_pixels_mut() {
+            let on = ((x / cell) + (y / cell)).is_multiple_of(2);
+            let v = if on { 220 } else { 40 };
+            *pixel = Rgb([v, v, v]);
+        }
+        image
+    }
+
+    #[test]
+    fn undersized_images_error() {
+        let image = DynamicImage::ImageRgb8(RgbImage::new(64, 64));
+        assert!(ResamplingDetector::new().detect(&image).is_err());
+    }
+
+    #[test]
+    fn estimated_factor_respects_the_configured_range() {
+        let detector = ResamplingDetector::new();
+        let image = DynamicImage::ImageRgb8(checkerboard(256, 256, 3));
+        let result = detector.detect(&image).unwrap();
+
+        if let Some(factor) = result.estimated_factor {
+            assert!(
+                (detector.config.min_factor..=detector.config.max_factor).contains(&factor),
+                "factor {factor} outside the configured bounds"
+            );
+        }
+    }
+
+    #[test]
+    fn probability_is_bounded() {
+        let image = DynamicImage::ImageRgb8(checkerboard(256, 192, 5));
+        let result = ResamplingDetector::new().detect(&image).unwrap();
+
+        assert!((0.0..=1.0).contains(&result.resampling_probability));
+    }
+
+    #[test]
+    fn regions_stay_within_the_image() {
+        let image = DynamicImage::ImageRgb8(checkerboard(200, 150, 4));
+        let result = ResamplingDetector::new().detect(&image).unwrap();
+
+        for region in &result.resampled_regions {
+            assert!(region.right() <= 200, "{region:?}");
+            assert!(region.bottom() <= 150, "{region:?}");
+        }
     }
 }

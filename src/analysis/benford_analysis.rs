@@ -2,7 +2,12 @@ use std::f64::consts::PI;
 
 use image::{DynamicImage, GrayImage, Luma};
 
-use crate::{SRegion, error::Result, image_utils::rgb_to_gray};
+use crate::{
+    SRegion,
+    error::Result,
+    image_utils::{ensure_min_dimensions, full_blocks, rgb_to_gray},
+    region::merge_regions,
+};
 
 #[derive(Debug, Clone)]
 pub struct BenfordConfig {
@@ -50,32 +55,29 @@ impl BenfordAnalyzer {
     }
 
     pub fn analyze(&self, image: &DynamicImage) -> Result<BenfordAnalysisResult> {
-        let rgb = image.to_rgb8();
-        let gray = rgb_to_gray(&rgb);
+        let gray = rgb_to_gray(&image.to_rgb8());
         let (width, height) = gray.dimensions();
 
-        if width < self.config.block_size || height < self.config.block_size {
-            return Err(crate::error::ForensicsError::ImageTooSmall(
-                self.config.block_size,
-            ));
-        }
+        ensure_min_dimensions(width, height, self.config.block_size)?;
 
-        let global_coefficients = self.extract_dct_coefficients(&gray);
-        let global_distribution = self.compute_first_digit_distribution(&global_coefficients);
-        let global_chi_square = self.compute_chi_square(&global_distribution);
+        // Every 8x8 DCT block is computed once here and reused for both the
+        // global distribution and the per-block sweep; the two passes
+        // previously recomputed overlapping blocks from scratch.
+        let dct_blocks = self.compute_dct_grid(&gray);
 
-        let (deviation_map, block_chi_squares) = self.analyze_blocks(&gray);
+        let global_coefficients: Vec<f64> = dct_blocks
+            .iter()
+            .flat_map(|block| block.coefficients.iter().copied())
+            .collect();
 
+        let global_distribution = self.first_digit_distribution(&global_coefficients);
+        let global_chi_square = self.chi_square(&global_distribution);
+
+        let (deviation_map, block_chi_squares) = self.analyze_blocks(width, height, &dct_blocks);
         let anomalous_regions = self.find_anomalous_regions(width, height, &block_chi_squares);
-
-        let conformity_score = self.calculate_conformity_score(global_chi_square);
-
-        let manipulation_probability = self.calculate_manipulation_probability(
-            global_chi_square,
-            &anomalous_regions,
-            width,
-            height,
-        );
+        let conformity_score = self.conformity_score(global_chi_square);
+        let manipulation_probability =
+            self.manipulation_probability(global_chi_square, &anomalous_regions, width, height);
 
         Ok(BenfordAnalysisResult {
             global_distribution,
@@ -88,271 +90,260 @@ impl BenfordAnalyzer {
         })
     }
 
-    fn extract_dct_coefficients(&self, gray: &GrayImage) -> Vec<f64> {
+    fn compute_dct_grid(&self, gray: &GrayImage) -> Vec<DctBlock> {
         let (width, height) = gray.dimensions();
-        let mut coefficients = Vec::new();
 
-        for by in (0..height - 7).step_by(8) {
-            for bx in (0..width - 7).step_by(8) {
-                let block_coeffs = self.compute_block_dct(gray, bx, by);
+        full_blocks(width, height, 8, 8)
+            .map(|region| {
+                let coeffs = block_dct_8x8(gray, region.x, region.y);
 
-                for coeff in block_coeffs.iter().skip(1) {
-                    if coeff.abs() >= 1.0 {
-                        coefficients.push(*coeff);
-                    }
+                DctBlock {
+                    x: region.x,
+                    y: region.y,
+                    // The DC term carries block brightness, not compression
+                    // structure, so Benford is applied to the AC terms only.
+                    coefficients: coeffs
+                        .into_iter()
+                        .skip(1)
+                        .filter(|c| c.abs() >= 1.0)
+                        .collect(),
                 }
-            }
-        }
-
-        coefficients
+            })
+            .collect()
     }
 
-    fn compute_block_dct(&self, gray: &GrayImage, bx: u32, by: u32) -> Vec<f64> {
-        let mut block = [[0.0f64; 8]; 8];
-
-        for y in 0..8 {
-            for x in 0..8 {
-                block[y][x] = gray.get_pixel(bx + x as u32, by + y as u32)[0] as f64 - 128.0;
-            }
-        }
-
-        let mut coeffs = Vec::with_capacity(64);
-
-        for u in 0..8 {
-            for v in 0..8 {
-                let cu = if u == 0 { 1.0 / 2.0_f64.sqrt() } else { 1.0 };
-                let cv = if v == 0 { 1.0 / 2.0_f64.sqrt() } else { 1.0 };
-
-                let mut sum = 0.0;
-                for y in 0..8 {
-                    for x in 0..8 {
-                        sum += block[y][x]
-                            * (PI * (2.0 * x as f64 + 1.0) * u as f64 / 16.0).cos()
-                            * (PI * (2.0 * y as f64 + 1.0) * v as f64 / 16.0).cos();
-                    }
-                }
-
-                coeffs.push(0.25 * cu * cv * sum);
-            }
-        }
-
-        coeffs
-    }
-
-    fn compute_first_digit_distribution(&self, coefficients: &[f64]) -> [f64; 9] {
+    fn first_digit_distribution(&self, coefficients: &[f64]) -> [f64; 9] {
         let mut counts = [0u32; 9];
         let mut total = 0u32;
 
         for &coeff in coefficients {
-            if let Some(first_digit) = self.get_first_digit(coeff.abs()) {
-                if first_digit >= 1 && first_digit <= 9 {
-                    counts[first_digit as usize - 1] += 1;
-                    total += 1;
-                }
+            if let Some(digit) = first_digit(coeff.abs()) {
+                counts[digit as usize - 1] += 1;
+                total += 1;
             }
         }
 
         let mut distribution = [0.0f64; 9];
         if total > 0 {
-            for i in 0..9 {
-                distribution[i] = counts[i] as f64 / total as f64;
+            for (slot, count) in distribution.iter_mut().zip(counts.iter()) {
+                *slot = *count as f64 / total as f64;
             }
         }
 
         distribution
     }
 
-    fn get_first_digit(&self, value: f64) -> Option<u8> {
-        if value < 1.0 {
-            return None;
-        }
-
-        let mut v = value;
-        while v >= 10.0 {
-            v /= 10.0;
-        }
-
-        Some(v as u8)
+    fn chi_square(&self, observed: &[f64; 9]) -> f64 {
+        observed
+            .iter()
+            .zip(self.expected.iter())
+            .filter(|(_, expected)| **expected > 0.0)
+            .map(|(&observed, &expected)| (observed - expected).powi(2) / expected)
+            .sum()
     }
 
-    fn compute_chi_square(&self, observed: &[f64; 9]) -> f64 {
-        let mut chi_square = 0.0;
-
-        for i in 0..9 {
-            let expected = self.expected[i];
-            let observed_val = observed[i];
-
-            if expected > 0.0 {
-                chi_square += (observed_val - expected).powi(2) / expected;
-            }
-        }
-
-        chi_square
-    }
-
-    fn analyze_blocks(&self, gray: &GrayImage) -> (GrayImage, Vec<(u32, u32, f64)>) {
-        let (width, height) = gray.dimensions();
+    fn analyze_blocks(
+        &self,
+        width: u32,
+        height: u32,
+        dct_blocks: &[DctBlock],
+    ) -> (GrayImage, Vec<(SRegion, f64)>) {
         let block_size = self.config.block_size;
+        let stride = (block_size / 2).max(1);
+
         let mut deviation_map = GrayImage::new(width, height);
         let mut block_chi_squares = Vec::new();
 
-        for by in (0..height - block_size).step_by(block_size as usize / 2) {
-            for bx in (0..width - block_size).step_by(block_size as usize / 2) {
-                let chi_square = self.analyze_single_block(gray, bx, by, block_size);
-                block_chi_squares.push((bx, by, chi_square));
+        for region in full_blocks(width, height, block_size, stride) {
+            let coefficients: Vec<f64> = dct_blocks
+                .iter()
+                .filter(|block| {
+                    block.x >= region.x
+                        && block.x < region.right()
+                        && block.y >= region.y
+                        && block.y < region.bottom()
+                })
+                .flat_map(|block| block.coefficients.iter().copied())
+                .collect();
 
-                let normalized = ((chi_square / 50.0).min(1.0) * 255.0) as u8;
+            let chi_square = if coefficients.len() < self.config.min_samples {
+                0.0
+            } else {
+                self.chi_square(&self.first_digit_distribution(&coefficients))
+            };
 
-                for y in by..(by + block_size).min(height) {
-                    for x in bx..(bx + block_size).min(width) {
-                        let current = deviation_map.get_pixel(x, y)[0];
-                        deviation_map.put_pixel(x, y, Luma([current.max(normalized)]));
-                    }
-                }
+            block_chi_squares.push((region, chi_square));
+
+            let normalized = ((chi_square / 50.0).min(1.0) * 255.0) as u8;
+            for (x, y) in region.clamp_to(width, height).pixels() {
+                let current = deviation_map.get_pixel(x, y)[0];
+                deviation_map.put_pixel(x, y, Luma([current.max(normalized)]));
             }
         }
 
         (deviation_map, block_chi_squares)
     }
 
-    fn analyze_single_block(&self, gray: &GrayImage, bx: u32, by: u32, size: u32) -> f64 {
-        let mut coefficients = Vec::new();
-
-        for y in (by..by + size - 7).step_by(8) {
-            for x in (bx..bx + size - 7).step_by(8) {
-                let block_coeffs = self.compute_block_dct(gray, x, y);
-                for coeff in block_coeffs.iter().skip(1) {
-                    if coeff.abs() >= 1.0 {
-                        coefficients.push(*coeff);
-                    }
-                }
-            }
-        }
-
-        if coefficients.len() < self.config.min_samples {
-            return 0.0;
-        }
-
-        let distribution = self.compute_first_digit_distribution(&coefficients);
-
-        self.compute_chi_square(&distribution)
-    }
-
     fn find_anomalous_regions(
         &self,
         width: u32,
         height: u32,
-        block_chi_squares: &[(u32, u32, f64)],
+        block_chi_squares: &[(SRegion, f64)],
     ) -> Vec<SRegion> {
-        let block_size = self.config.block_size;
-
         let regions = block_chi_squares
             .iter()
-            .filter(|(_, _, chi)| *chi > self.config.chi_square_threshold)
-            .map(|(x, y, _)| SRegion {
-                x: *x,
-                y: *y,
-                width: block_size.min(width - x),
-                height: block_size.min(height - y),
-            })
-            .collect::<Vec<_>>();
+            .filter(|(_, chi)| *chi > self.config.chi_square_threshold)
+            .map(|(region, _)| region.clamp_to(width, height))
+            .collect();
 
-        self.merge_regions(regions)
+        merge_regions(regions, self.config.block_size / 2)
     }
 
-    fn merge_regions(&self, regions: Vec<SRegion>) -> Vec<SRegion> {
-        if regions.is_empty() {
-            return regions;
-        }
-
-        let mut merged = Vec::new();
-        let mut used = vec![false; regions.len()];
-
-        for i in 0..regions.len() {
-            if used[i] {
-                continue;
-            }
-
-            let mut current = regions[i];
-            used[i] = true;
-
-            loop {
-                let mut found = false;
-                for j in 0..regions.len() {
-                    if used[j] {
-                        continue;
-                    }
-
-                    if self.regions_adjacent(&current, &regions[j]) {
-                        current = self.merge_two_regions(&current, &regions[j]);
-                        used[j] = true;
-                        found = true;
-                    }
-                }
-
-                if !found {
-                    break;
-                }
-            }
-
-            merged.push(current);
-        }
-
-        merged
+    fn conformity_score(&self, chi_square: f64) -> f64 {
+        (1.0 - chi_square / 30.0).clamp(0.0, 1.0)
     }
 
-    fn regions_adjacent(&self, a: &SRegion, b: &SRegion) -> bool {
-        let gap = self.config.block_size / 2;
-
-        !(a.x + a.width + gap < b.x
-            || b.x + b.width + gap < a.x
-            || a.y + a.height + gap < b.y
-            || b.y + b.height + gap < a.y)
-    }
-
-    fn merge_two_regions(&self, a: &SRegion, b: &SRegion) -> SRegion {
-        let x = a.x.min(b.x);
-        let y = a.y.min(b.y);
-        let x2 = (a.x + a.width).max(b.x + b.width);
-        let y2 = (a.y + a.width).max(b.y + b.height);
-
-        SRegion {
-            x,
-            y,
-            width: x2 - x,
-            height: y2 - y,
-        }
-    }
-
-    fn calculate_conformity_score(&self, chi_square: f64) -> f64 {
-        (1.0 - chi_square / 30.0).max(0.0).min(1.0)
-    }
-
-    fn calculate_manipulation_probability(
+    fn manipulation_probability(
         &self,
         global_chi_square: f64,
         anomalous_regions: &[SRegion],
         width: u32,
         height: u32,
     ) -> f64 {
-        let total_pixels = (width * height) as f64;
+        let total_pixels = (width as f64) * (height as f64);
+        let anomalous_pixels: u64 = anomalous_regions.iter().map(|r| r.area()).sum();
 
-        let anomalous_pixels = anomalous_regions
-            .iter()
-            .map(|r| r.width * r.height)
-            .sum::<u32>();
-
-        let coverage = anomalous_pixels as f64 / total_pixels;
+        let coverage = if total_pixels > 0.0 {
+            anomalous_pixels as f64 / total_pixels
+        } else {
+            0.0
+        };
 
         let global_factor = (global_chi_square / 30.0).min(1.0);
-        let local_factor = coverage * 2.0;
+        let local_factor = (coverage * 2.0).min(1.0);
 
-        (global_factor * 0.5 + local_factor * 0.5).min(1.0)
+        (global_factor * 0.5 + local_factor * 0.5).clamp(0.0, 1.0)
     }
+}
+
+struct DctBlock {
+    x: u32,
+    y: u32,
+    coefficients: Vec<f64>,
+}
+
+/// Leading significant digit of a magnitude, or `None` below 1.0.
+fn first_digit(value: f64) -> Option<u8> {
+    if !value.is_finite() || value < 1.0 {
+        return None;
+    }
+
+    let mut v = value;
+    while v >= 10.0 {
+        v /= 10.0;
+    }
+
+    let digit = v as u8;
+    (1..=9).contains(&digit).then_some(digit)
+}
+
+/// Naive 8x8 DCT-II with the JPEG level shift applied.
+fn block_dct_8x8(gray: &GrayImage, bx: u32, by: u32) -> Vec<f64> {
+    let mut block = [[0.0f64; 8]; 8];
+
+    for (y, row) in block.iter_mut().enumerate() {
+        for (x, cell) in row.iter_mut().enumerate() {
+            *cell = gray.get_pixel(bx + x as u32, by + y as u32)[0] as f64 - 128.0;
+        }
+    }
+
+    let mut coeffs = Vec::with_capacity(64);
+
+    for u in 0..8 {
+        for v in 0..8 {
+            let cu = if u == 0 { 1.0 / 2.0_f64.sqrt() } else { 1.0 };
+            let cv = if v == 0 { 1.0 / 2.0_f64.sqrt() } else { 1.0 };
+
+            let mut sum = 0.0;
+            for (y, row) in block.iter().enumerate() {
+                for (x, &cell) in row.iter().enumerate() {
+                    sum += cell
+                        * (PI * (2.0 * x as f64 + 1.0) * u as f64 / 16.0).cos()
+                        * (PI * (2.0 * y as f64 + 1.0) * v as f64 / 16.0).cos();
+                }
+            }
+
+            coeffs.push(0.25 * cu * cv * sum);
+        }
+    }
+
+    coeffs
 }
 
 impl Default for BenfordAnalyzer {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use image::{Rgb, RgbImage};
+
+    use super::*;
+
+    fn gradient(width: u32, height: u32) -> DynamicImage {
+        let mut image = RgbImage::new(width, height);
+        for (x, y, pixel) in image.enumerate_pixels_mut() {
+            let v = ((x * 7 + y * 11) % 256) as u8;
+            *pixel = Rgb([v, v, v]);
+        }
+        DynamicImage::ImageRgb8(image)
+    }
+
+    #[test]
+    fn expected_distribution_sums_to_one() {
+        let analyzer = BenfordAnalyzer::new();
+        let total: f64 = analyzer.expected.iter().sum();
+
+        assert!((total - 1.0).abs() < 1e-9, "sums to {total}");
+        // P(1) = log10(2)
+        assert!((analyzer.expected[0] - std::f64::consts::LOG10_2).abs() < 1e-9);
+    }
+
+    #[test]
+    fn first_digit_extracts_the_leading_significant_digit() {
+        assert_eq!(first_digit(1.0), Some(1));
+        assert_eq!(first_digit(9.99), Some(9));
+        assert_eq!(first_digit(4321.0), Some(4));
+        assert_eq!(first_digit(0.5), None);
+        assert_eq!(first_digit(f64::NAN), None);
+    }
+
+    #[test]
+    fn regions_stay_within_the_image() {
+        // 150 is not a multiple of the 64px block size. The union helper used
+        // to build merged heights from `a.y + a.width`, producing boxes that
+        // ran off the bottom of non-square images.
+        let result = BenfordAnalyzer::new().analyze(&gradient(150, 200)).unwrap();
+
+        for region in &result.anomalous_regions {
+            assert!(region.right() <= 150, "{region:?} overruns the width");
+            assert!(region.bottom() <= 200, "{region:?} overruns the height");
+        }
+    }
+
+    #[test]
+    fn undersized_images_error_rather_than_panic() {
+        let image = DynamicImage::ImageRgb8(RgbImage::new(32, 32));
+        assert!(BenfordAnalyzer::new().analyze(&image).is_err());
+    }
+
+    #[test]
+    fn probabilities_are_bounded() {
+        let result = BenfordAnalyzer::new().analyze(&gradient(128, 128)).unwrap();
+
+        assert!((0.0..=1.0).contains(&result.manipulation_probability));
+        assert!((0.0..=1.0).contains(&result.conformity_score));
     }
 }

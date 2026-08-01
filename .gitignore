@@ -23,3 +23,6 @@ target
 output
 evidences
 forensics_report
+
+# Cobalt build output for the docs site
+docs/_site

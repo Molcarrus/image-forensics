@@ -1,0 +1,81 @@
+# _data/modules.yml
+modules:
+  - name: "ELA"
+    slug: "ela"
+    description: "Error Level Analysis for detecting JPEG re-compression artifacts"
+    category: "compression"
+
+  - name: "Noise Analysis"
+    slug: "noise"
+    description: "Detects inconsistencies in noise patterns across image regions"
+    category: "statistical"
+
+  - name: "Copy-Move Detection"
+    slug: "copy-move"
+    description: "Identifies duplicated regions within an image"
+    category: "geometric"
+
+  - name: "Splicing Detection"
+    slug: "splicing"
+    description: "Detects regions composited from different source images"
+    category: "composite"
+
+  - name: "Benford Analysis"
+    slug: "benford"
+    description: "Applies Benford's Law to DCT coefficients for tampering detection"
+    category: "statistical"
+
+  - name: "DCT Analysis"
+    slug: "dct"
+    description: "Analyzes Discrete Cosine Transform coefficients for compression artifacts"
+    category: "compression"
+
+  - name: "CFA Analysis"
+    slug: "cfa"
+    description: "Detects Color Filter Array demosaicing inconsistencies"
+    category: "sensor"
+
+  - name: "Chromatic Aberration"
+    slug: "chromatic-aberration"
+    description: "Analyzes lens chromatic aberration consistency"
+    category: "optical"
+
+  - name: "Histogram Analysis"
+    slug: "histogram"
+    description: "Statistical analysis of pixel value distributions"
+    category: "statistical"
+
+  - name: "JPEG Analysis"
+    slug: "jpeg"
+    description: "Detects JPEG compression artifacts and double compression"
+    category: "compression"
+
+  - name: "Luminance Gradient"
+    slug: "luminance-gradient"
+    description: "Analyzes lighting gradient consistency across the image"
+    category: "optical"
+
+  - name: "PCA Analysis"
+    slug: "pca"
+    description: "Principal Component Analysis for anomaly detection"
+    category: "statistical"
+
+  - name: "PRNU Analysis"
+    slug: "prnu"
+    description: "Photo Response Non-Uniformity sensor fingerprinting"
+    category: "sensor"
+
+  - name: "Resampling Detection"
+    slug: "resampling"
+    description: "Detects traces of geometric transformations"
+    category: "geometric"
+
+  - name: "Shadow Analysis"
+    slug: "shadow"
+    description: "Validates shadow direction and lighting consistency"
+    category: "optical"
+
+  - name: "Tampering Detection"
+    slug: "tampering"
+    description: "Combined multi-method tampering analysis"
+    category: "composite"

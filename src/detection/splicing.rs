@@ -1,11 +1,11 @@
 use image::{GrayImage, Luma, Rgb, RgbImage};
 
 use crate::{
-    SRegion,
+    SRegion, draw,
     analysis::{ela::ElaAnalyzer, noise::NoiseAnalyzer},
     detection::{ConfidenceLevel, DetectedManipulation, DetectionResult, Detector},
     error::Result,
-    image_utils::rgb_to_gray,
+    image_utils::{clipped_blocks, ensure_min_dimensions, rgb_to_gray, sobel},
 };
 
 #[derive(Debug, Clone)]
@@ -54,31 +54,19 @@ impl SplicingDetector {
 
         let global_histogram = self.calculate_color_histogram(image, 0, 0, width, height);
 
-        for by in (0..height).step_by(block_size as usize) {
-            for bx in (0..width).step_by(block_size as usize) {
-                let block_w = block_size.min(width - bx);
-                let block_h = block_size.min(height - by);
+        for block in clipped_blocks(width, height, block_size, block_size) {
+            let block_histogram =
+                self.calculate_color_histogram(image, block.x, block.y, block.width, block.height);
 
-                let block_histogram =
-                    self.calculate_color_histogram(image, bx, by, block_w, block_h);
+            let diff = self.histogram_difference(&global_histogram, &block_histogram);
+            let inconsistency = (diff * 255.0 * self.config.color_sensitivity).min(255.0) as u8;
 
-                let diff = self.histogram_difference(&global_histogram, &block_histogram);
-                let inconsistency = (diff * 255.0 * self.config.color_sensitivity).min(255.0) as u8;
+            for (x, y) in block.pixels() {
+                inconsistency_map.put_pixel(x, y, Luma([inconsistency]));
+            }
 
-                for y in by..(by + block_h) {
-                    for x in bx..(bx + block_w) {
-                        inconsistency_map.put_pixel(x, y, Luma([inconsistency]));
-                    }
-                }
-
-                if diff > 0.3 * self.config.color_sensitivity {
-                    suspicious_regions.push(SRegion {
-                        x: bx,
-                        y: by,
-                        width: block_w,
-                        height: block_h,
-                    });
-                }
+            if diff > 0.3 * self.config.color_sensitivity {
+                suspicious_regions.push(block);
             }
         }
 
@@ -151,8 +139,7 @@ impl SplicingDetector {
 
         for y in 1..height - 1 {
             for x in 1..width - 1 {
-                let gx = self.sobel_x(&gray, x, y);
-                let gy = self.sobel_y(&gray, x, y);
+                let (gx, gy) = sobel(&gray, x, y);
                 let magnitude = (gx * gx + gy * gy).sqrt();
                 edge_map.put_pixel(x, y, Luma([(magnitude.min(255.0)) as u8]));
             }
@@ -164,32 +151,6 @@ impl SplicingDetector {
         (edge_map, suspicious_regions)
     }
 
-    fn sobel_x(&self, gray: &GrayImage, x: u32, y: u32) -> f64 {
-        let get_pixel = |dx: i32, dy: i32| -> f64 {
-            let px = (x as i32 + dx).max(0) as u32;
-            let py = (y as i32 + dy).max(0) as u32;
-            gray.get_pixel(px.min(gray.width() - 1), py.min(gray.height() - 1))[0] as f64
-        };
-
-        -get_pixel(-1, -1) - 2.0 * get_pixel(-1, 0) - get_pixel(-1, 1)
-            + get_pixel(1, -1)
-            + 2.0 * get_pixel(1, 0)
-            + get_pixel(1, 1)
-    }
-
-    fn sobel_y(&self, gray: &GrayImage, x: u32, y: u32) -> f64 {
-        let get_pixel = |dx: i32, dy: i32| -> f64 {
-            let px = (x as i32 + dx).max(0) as u32;
-            let py = (y as i32 + dy).max(0) as u32;
-            gray.get_pixel(px.min(gray.width() - 1), py.min(gray.height() - 1))[0] as f64
-        };
-
-        -get_pixel(-1, -1) - 2.0 * get_pixel(0, -1) - get_pixel(1, -1)
-            + get_pixel(-1, 1)
-            + 2.0 * get_pixel(0, 1)
-            + get_pixel(1, 1)
-    }
-
     fn find_unnatural_edges(&self, edge_map: &GrayImage) -> Vec<SRegion> {
         let (width, height) = edge_map.dimensions();
         let mut regions = Vec::new();
@@ -197,22 +158,17 @@ impl SplicingDetector {
 
         let edge_threshold = 0.9 - (0.4 * self.config.edge_sensitivity);
 
-        for by in (0..height).step_by(block_size as usize) {
-            for bx in (0..width).step_by(block_size as usize) {
-                let block_w = block_size.min(width - bx);
-                let block_h = block_size.min(height - by);
+        for block in clipped_blocks(width, height, block_size, block_size) {
+            let (horizontal_score, vertical_score) = self.analyze_edge_regularity(
+                edge_map,
+                block.x,
+                block.y,
+                block.width,
+                block.height,
+            );
 
-                let (horizontal_score, vertical_score) =
-                    self.analyze_edge_regularity(edge_map, bx, by, block_w, block_h);
-
-                if horizontal_score > edge_threshold || vertical_score > edge_threshold {
-                    regions.push(SRegion {
-                        x: bx,
-                        y: by,
-                        width: block_w,
-                        height: block_h,
-                    });
-                }
+            if horizontal_score > edge_threshold || vertical_score > edge_threshold {
+                regions.push(block);
             }
         }
 
@@ -287,9 +243,7 @@ impl SplicingDetector {
             .sum::<f64>()
             / intervals.len() as f64;
 
-        let regularity = 1.0 / (1.0 + variance.sqrt());
-
-        regularity
+        1.0 / (1.0 + variance.sqrt())
     }
 
     fn combine_analyses(
@@ -305,20 +259,15 @@ impl SplicingDetector {
         all_regions.extend_from_slice(noise_regions);
         all_regions.extend_from_slice(ela_regions);
 
-        let mut seen = Vec::new();
+        let mut seen = std::collections::HashSet::new();
         let mut combined = Vec::new();
 
         for region in &all_regions {
-            if seen.iter().any(|s: &SRegion| {
-                s.x == region.x
-                    && s.y == region.y
-                    && s.width == region.width
-                    && s.height == region.height
-            }) {
+            // `SRegion` derives `Eq`/`Hash`, so identity dedup is a set lookup
+            // rather than the linear field-by-field scan this replaces.
+            if !seen.insert(*region) {
                 continue;
             }
-
-            seen.push(*region);
 
             let mut score = 0.0;
             let mut evidence_count = 0;
@@ -358,10 +307,7 @@ impl SplicingDetector {
     }
 
     fn regions_overlap(&self, a: &SRegion, b: &SRegion) -> bool {
-        !(a.x + a.width <= b.x
-            || b.x + b.width <= a.x
-            || a.y + a.height <= b.y
-            || b.y + b.height <= a.y)
+        a.overlaps(b)
     }
 
     fn merge_overlapping_detections(
@@ -397,7 +343,7 @@ impl SplicingDetector {
                     }
 
                     if self.regions_overlap(&current, &detections[j].0) {
-                        current = self.merge_regions(&current, &detections[j].0);
+                        current = current.union(&detections[j].0);
                         max_score = max_score.max(detections[j].1);
                         used[j] = true;
                         found = true;
@@ -410,26 +356,12 @@ impl SplicingDetector {
                 }
             }
 
-            if current.width * current.height >= self.config.min_region_size {
+            if current.area() >= self.config.min_region_size as u64 {
                 merged.push((current, max_score));
             }
         }
 
         merged
-    }
-
-    fn merge_regions(&self, a: &SRegion, b: &SRegion) -> SRegion {
-        let x = a.x.min(b.x);
-        let y = a.y.min(b.y);
-        let x2 = (a.x + a.width).max(b.x + b.width);
-        let y2 = (a.y + a.height).max(b.y + b.height);
-
-        SRegion {
-            x,
-            y,
-            width: x2 - x,
-            height: y2 - y,
-        }
     }
 
     fn create_visualization(&self, original: &RgbImage, detections: &[(SRegion, f64)]) -> RgbImage {
@@ -439,59 +371,10 @@ impl SplicingDetector {
             let intensity = (*score * 255.0).min(255.0) as u8;
             let color = Rgb([intensity, (255u8.saturating_sub(intensity)), 0]);
 
-            self.draw_rectangle(&mut vis, region, color, 2);
+            draw::rect(&mut vis, region, color, 2);
         }
 
         vis
-    }
-
-    fn draw_rectangle(
-        &self,
-        image: &mut RgbImage,
-        region: &SRegion,
-        color: Rgb<u8>,
-        thickness: u32,
-    ) {
-        let (width, height) = image.dimensions();
-
-        let x_start = region.x.saturating_sub(thickness);
-        let x_end = region
-            .x
-            .saturating_add(region.width)
-            .saturating_add(thickness)
-            .min(width);
-        let y_start = region.y.saturating_sub(thickness);
-        let y_end = region
-            .y
-            .saturating_add(region.height)
-            .saturating_add(thickness)
-            .min(height);
-
-        for t in 0..thickness {
-            let top_y = region.y.saturating_sub(t);
-            let bot_y = region.y.saturating_add(region.height).saturating_add(t);
-
-            for x in x_start..x_end {
-                if top_y < height {
-                    image.put_pixel(x, top_y, color);
-                }
-                if bot_y < height {
-                    image.put_pixel(x, bot_y, color);
-                }
-            }
-
-            let left_x = region.x.saturating_sub(t);
-            let right_x = region.x.saturating_add(region.width).saturating_add(t);
-
-            for y in y_start..y_end {
-                if left_x < width {
-                    image.put_pixel(left_x, y, color);
-                }
-                if right_x < width {
-                    image.put_pixel(right_x, y, color);
-                }
-            }
-        }
     }
 }
 
@@ -500,11 +383,7 @@ impl Detector for SplicingDetector {
         let rgb = image.to_rgb8();
         let (width, height) = rgb.dimensions();
 
-        if width < self.config.block_size * 2 || height < self.config.block_size * 2 {
-            return Err(crate::error::ForensicsError::ImageTooSmall(
-                self.config.block_size * 2,
-            ));
-        }
+        ensure_min_dimensions(width, height, self.config.block_size * 2)?;
 
         let mut result = DetectionResult::new(&rgb);
 
@@ -577,5 +456,55 @@ impl Detector for SplicingDetector {
 impl Default for SplicingDetector {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use image::{Rgb, RgbImage};
+
+    use super::*;
+
+    /// Two visually distinct halves, i.e. a crude composite.
+    fn composite(width: u32, height: u32) -> image::DynamicImage {
+        let mut image = RgbImage::new(width, height);
+
+        for (x, y, pixel) in image.enumerate_pixels_mut() {
+            *pixel = if x < width / 2 {
+                let v = (((x * 13) ^ (y * 3)) % 200) as u8;
+                Rgb([v, v / 2, 30])
+            } else {
+                let v = (((x * 5) ^ (y * 17)) % 120 + 130) as u8;
+                Rgb([30, v, v])
+            };
+        }
+
+        image::DynamicImage::ImageRgb8(image)
+    }
+
+    #[test]
+    fn detected_regions_stay_within_the_image() {
+        let result = SplicingDetector::new().detect(&composite(150, 130)).unwrap();
+
+        for manipulation in &result.manipulations {
+            assert!(manipulation.region.right() <= 150, "{:?}", manipulation.region);
+            assert!(manipulation.region.bottom() <= 130, "{:?}", manipulation.region);
+        }
+    }
+
+    #[test]
+    fn undersized_images_error() {
+        let image = image::DynamicImage::ImageRgb8(RgbImage::new(16, 16));
+        assert!(SplicingDetector::new().detect(&image).is_err());
+    }
+
+    #[test]
+    fn scores_are_bounded() {
+        let result = SplicingDetector::new().detect(&composite(128, 128)).unwrap();
+
+        assert!((0.0..=1.0).contains(&result.overall_score));
+        for manipulation in &result.manipulations {
+            assert!((0.0..=1.0).contains(&manipulation.confidence));
+        }
     }
 }

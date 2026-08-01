@@ -7,19 +7,14 @@ edition = "2024"
 image = "0.25.9"
 imageproc = "0.25.0"
 kamadak-exif = "0.6.1"
-log = "0.4.29"
 ndarray = "0.17.1"
-ndarray-linalg = "0.18.0"
-ndarray-stats = "0.6.0"
-num-complex = "0.4.6"
-parking_lot = "0.12.5"
 rayon = "1.11.0"
-rustfft = "6.4.1"
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.145"
-statrs = "0.18.0"
 thiserror = "2.0.17"
 
-[dev-dependencies]
-criterion = "0.8.1"
-tempfile = "3.23.0"
+# Removed as unreferenced: `ndarray-linalg` (which also drags in a BLAS/LAPACK
+# backend and is a common source of Windows build failures), `ndarray-stats`,
+# `statrs`, `parking_lot`, `log`, and the `criterion`/`tempfile` dev-deps.
+# `num-complex` and `rustfft` went with the copy-move rewrite, which now uses a
+# real separable DCT instead of a 1-D FFT over a flattened block.

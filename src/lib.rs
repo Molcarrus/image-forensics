@@ -1,7 +1,6 @@
 use std::path::Path;
 
 use image::{DynamicImage, GrayImage, RgbImage};
-use serde::{Deserialize, Serialize};
 
 use crate::{
     analysis::{
@@ -14,17 +13,20 @@ use crate::{
 
 pub mod analysis;
 pub mod detection;
+pub mod draw;
 pub mod error;
 pub mod image_utils;
 pub mod metadata;
+pub mod region;
 pub mod report;
+
+pub use region::{SRegion, merge_regions};
 
 #[derive(Debug, Clone)]
 pub struct AnalysisConfig {
     pub ela_quality: u8,
     pub block_size: u32,
     pub similarity_threshold: f64,
-    pub parallel: bool,
     pub min_match_distance: u32,
 }
 
@@ -34,7 +36,6 @@ impl Default for AnalysisConfig {
             ela_quality: 95,
             block_size: 16,
             similarity_threshold: 0.95,
-            parallel: true,
             min_match_distance: 50,
         }
     }
@@ -72,11 +73,10 @@ impl ForensicsAnalyzer {
     }
 
     pub fn ela(&self, quality: u8) -> Result<ElaResult> {
-        let analyzer = ElaAnalyzer::new(quality);
-        analyzer.analyze(&self.original)
+        ElaAnalyzer::new(quality).analyze(&self.original)
     }
 
-    pub fn detect_cop_move(&self) -> Result<CopyMoveResult> {
+    pub fn detect_copy_move(&self) -> Result<CopyMoveResult> {
         let detector = CopyMoveDetector::new(
             self.config.block_size,
             self.config.similarity_threshold,
@@ -86,78 +86,79 @@ impl ForensicsAnalyzer {
     }
 
     pub fn analyze_noise(&self) -> Result<NoiseResult> {
-        let analyzer = NoiseAnalyzer::new();
-        analyzer.analyze(&self.original)
+        NoiseAnalyzer::new().analyze(&self.original)
     }
 
     pub fn analyze_jpeg(&self) -> Result<JpegAnalysisResult> {
-        let analyzer = JpegAnalyzer::new();
-        analyzer.analyze(&self.original)
+        JpegAnalyzer::new().analyze(&self.original)
     }
 
     pub fn extract_metadata(&self) -> Result<MetadataResult> {
-        if let Some(ref path) = self.path {
-            ExifExtractor::extract(path)
-        } else {
-            Err(ForensicsError::MetadataError(
-                "No file patha available for metasata extraction".into(),
-            ))
+        match self.path {
+            Some(ref path) => ExifExtractor::extract(path),
+            None => Err(ForensicsError::MetadataError(
+                "no file path available for metadata extraction".into(),
+            )),
         }
     }
 
     pub fn full_analysis(&self) -> Result<FullAnalysisReport> {
         let ela = self.ela(self.config.ela_quality)?;
-        let copy_move = self.detect_cop_move()?;
+        let copy_move = self.detect_copy_move()?;
         let noise = self.analyze_noise()?;
         let jpeg = self.analyze_jpeg()?;
         let metadata = self.extract_metadata().ok();
 
+        let tampering_probability =
+            Self::calculate_tampering_probability(&ela, &copy_move, &noise, &jpeg);
+
         Ok(FullAnalysisReport {
-            ela: ela.clone(),
-            copy_move: copy_move.clone(),
-            noise: noise.clone(),
-            jpeg: jpeg.clone(),
+            ela,
+            copy_move,
+            noise,
+            jpeg,
             metadata,
-            tampering_ability: Self::calculate_tampering_probability(
-                &ela, &copy_move, &noise, &jpeg,
-            ),
+            tampering_probability,
         })
     }
 
+    /// Combine the four core signals into a single `[0, 1]` score.
+    ///
+    /// Each signal contributes its own weight out of a fixed total. Dividing by
+    /// the *triggered* weight instead — as this previously did — meant a single
+    /// weak signal produced a maximal score: an image whose only positive was
+    /// `ghost_detected` scored `0.1 / 0.1 = 1.0`, i.e. certain tampering.
     fn calculate_tampering_probability(
         ela: &ElaResult,
         copy_move: &CopyMoveResult,
         noise: &NoiseResult,
         jpeg: &JpegAnalysisResult,
     ) -> f64 {
+        const W_ELA: f64 = 0.3;
+        const W_COPY_MOVE: f64 = 0.4;
+        const W_NOISE: f64 = 0.2;
+        const W_JPEG: f64 = 0.1;
+        const TOTAL_WEIGHT: f64 = W_ELA + W_COPY_MOVE + W_NOISE + W_JPEG;
+
         let mut score = 0.0;
-        let mut weight_sum = 0.0;
 
         if ela.max_difference > 50.0 {
-            score += 0.3 * (ela.max_difference / 255.0).min(1.0);
-            weight_sum += 0.3;
+            score += W_ELA * (ela.max_difference / 255.0).min(1.0);
         }
 
         if !copy_move.matches.is_empty() {
-            score += 0.4 * (copy_move.matches.len() as f64 / 100.0).min(1.0);
-            weight_sum += 0.4;
+            score += W_COPY_MOVE * (copy_move.matches.len() as f64 / 100.0).min(1.0);
         }
 
         if noise.inconsistency_score > 0.3 {
-            score += 0.2 * noise.inconsistency_score;
-            weight_sum += 0.2;
+            score += W_NOISE * noise.inconsistency_score.min(1.0);
         }
 
         if jpeg.ghost_detected {
-            score += 0.1;
-            weight_sum += 0.1;
+            score += W_JPEG;
         }
 
-        if weight_sum > 0.0 {
-            score / weight_sum
-        } else {
-            0.0
-        }
+        (score / TOTAL_WEIGHT).clamp(0.0, 1.0)
     }
 }
 
@@ -192,14 +193,6 @@ pub struct MatchPair {
     pub similarity: f64,
 }
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
-pub struct SRegion {
-    pub x: u32,
-    pub y: u32,
-    pub width: u32,
-    pub height: u32,
-}
-
 #[derive(Debug, Clone)]
 pub struct NoiseResult {
     pub noise_map: GrayImage,
@@ -213,6 +206,7 @@ pub struct NoiseResult {
 pub struct JpegAnalysisResult {
     pub quality_estimate: u8,
     pub ghost_detected: bool,
+    pub ghost_quality: Option<u8>,
     pub ghost_map: Option<GrayImage>,
     pub blocking_artifact_map: GrayImage,
     pub double_compression_likelihood: f64,
@@ -236,5 +230,5 @@ pub struct FullAnalysisReport {
     pub noise: NoiseResult,
     pub jpeg: JpegAnalysisResult,
     pub metadata: Option<MetadataResult>,
-    pub tampering_ability: f64,
+    pub tampering_probability: f64,
 }

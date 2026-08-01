@@ -1,14 +1,14 @@
 use image::{DynamicImage, GrayImage, Rgb, RgbImage};
 
 use crate::{
-    SRegion,
+    SRegion, draw,
     analysis::{copy_move::CopyMoveDetector, jpeg_analysis::JpegAnalyzer},
     detection::{
         ConfidenceLevel, DetectedManipulation, DetectionResult, Detector, ManipulationType,
         splicing::SplicingDetector,
     },
     error::Result,
-    image_utils::rgb_to_gray,
+    image_utils::{clipped_blocks, mean_and_variance, rgb_to_gray},
 };
 
 #[derive(Debug, Clone)]
@@ -90,51 +90,34 @@ impl TamperingDetector {
         let block_size = self.config.block_size;
         let gray = rgb_to_gray(image);
 
-        let mut results = Vec::new();
-        let mut block_textures = Vec::new();
+        let blocks: Vec<SRegion> = clipped_blocks(width, height, block_size, block_size).collect();
 
-        for by in (0..height).step_by(block_size as usize) {
-            for bx in (0..width).step_by(block_size as usize) {
-                let texture = self.calculate_texture_measure(&gray, bx, by, block_size);
-                block_textures.push((bx, by, texture));
-            }
+        if blocks.is_empty() {
+            return Vec::new();
         }
 
-        if block_textures.is_empty() {
-            return results;
-        }
-
-        let mean_texture =
-            block_textures.iter().map(|(_, _, t)| t).sum::<f64>() / block_textures.len() as f64;
-        let variance = block_textures
+        let textures: Vec<f64> = blocks
             .iter()
-            .map(|(_, _, t)| (t - mean_texture).powi(2))
-            .sum::<f64>()
-            / block_textures.len() as f64;
+            .map(|block| self.calculate_texture_measure(&gray, block.x, block.y, block_size))
+            .collect();
+
+        let (mean_texture, variance) = mean_and_variance(&textures);
         let std_dev = variance.sqrt();
 
-        for (bx, by, texture) in block_textures {
-            let z_score = if std_dev > 0.0 {
-                (texture - mean_texture).abs() / std_dev
-            } else {
-                0.0
-            };
+        blocks
+            .into_iter()
+            .zip(textures)
+            .filter_map(|(block, texture)| {
+                let z_score = if std_dev > 0.0 {
+                    (texture - mean_texture).abs() / std_dev
+                } else {
+                    0.0
+                };
 
-            if z_score > 2.0 * self.config.sensitivity {
-                let score = (z_score / 5.0).min(1.0);
-                results.push((
-                    SRegion {
-                        x: bx,
-                        y: by,
-                        width: block_size.min(width - bx),
-                        height: block_size.min(height - by),
-                    },
-                    score,
-                ));
-            }
-        }
-
-        results
+                (z_score > 2.0 * self.config.sensitivity)
+                    .then(|| (block, (z_score / 5.0).min(1.0)))
+            })
+            .collect()
     }
 
     fn calculate_texture_measure(&self, gray: &GrayImage, x: u32, y: u32, size: u32) -> f64 {
@@ -168,54 +151,41 @@ impl TamperingDetector {
         let block_size = self.config.block_size;
         let gray = rgb_to_gray(image);
 
-        let mut results = Vec::new();
-        let mut block_sharpness = Vec::new();
+        // The region built here previously used `block_size.midpoint(height - by)`
+        // for its height -- a typo for `.min(...)` that averaged the block size
+        // with the remaining rows, so flagged regions ran past the image edge.
+        // `clipped_blocks` now does the clamping.
+        let blocks: Vec<SRegion> = clipped_blocks(width, height, block_size, block_size).collect();
 
-        for by in (0..height).step_by(block_size as usize) {
-            for bx in (0..width).step_by(block_size as usize) {
-                let sharpness = self.calculate_laplcaian_variance(&gray, bx, by, block_size);
-                block_sharpness.push((bx, by, sharpness));
-            }
+        if blocks.is_empty() {
+            return Vec::new();
         }
 
-        if block_sharpness.is_empty() {
-            return results;
-        }
-
-        let mean_sharpness =
-            block_sharpness.iter().map(|(_, _, s)| s).sum::<f64>() / block_sharpness.len() as f64;
-        let variance = block_sharpness
+        let sharpness: Vec<f64> = blocks
             .iter()
-            .map(|(_, _, s)| (s - mean_sharpness).powi(2))
-            .sum::<f64>()
-            / block_sharpness.len() as f64;
+            .map(|block| self.calculate_laplacian_variance(&gray, block.x, block.y, block_size))
+            .collect();
+
+        let (mean_sharpness, variance) = mean_and_variance(&sharpness);
         let std_dev = variance.sqrt();
 
-        for (bx, by, sharpness) in block_sharpness {
-            let z_score = if std_dev > 0.0 {
-                (sharpness - mean_sharpness).abs() / std_dev
-            } else {
-                0.0
-            };
+        blocks
+            .into_iter()
+            .zip(sharpness)
+            .filter_map(|(block, value)| {
+                let z_score = if std_dev > 0.0 {
+                    (value - mean_sharpness).abs() / std_dev
+                } else {
+                    0.0
+                };
 
-            if z_score > 2.5 * self.config.sensitivity {
-                let score = (z_score / 5.0).min(1.0);
-                results.push((
-                    SRegion {
-                        x: bx,
-                        y: by,
-                        width: block_size.min(width - bx),
-                        height: block_size.midpoint(height - by),
-                    },
-                    score,
-                ));
-            }
-        }
-
-        results
+                (z_score > 2.5 * self.config.sensitivity)
+                    .then(|| (block, (z_score / 5.0).min(1.0)))
+            })
+            .collect()
     }
 
-    fn calculate_laplcaian_variance(&self, gray: &GrayImage, x: u32, y: u32, size: u32) -> f64 {
+    fn calculate_laplacian_variance(&self, gray: &GrayImage, x: u32, y: u32, size: u32) -> f64 {
         let (width, height) = gray.dimensions();
         let mut laplacian_values = Vec::new();
 
@@ -241,22 +211,14 @@ impl TamperingDetector {
             return 0.0;
         }
 
-        let mean = laplacian_values.iter().sum::<f64>() / laplacian_values.len() as f64;
-        let variance = laplacian_values
-            .iter()
-            .map(|v| (v - mean).powi(2))
-            .sum::<f64>()
-            / laplacian_values.len() as f64;
-
-        variance
+        mean_and_variance(&laplacian_values).1
     }
 
     fn analyze_double_compression(
         &self,
         image: &DynamicImage,
     ) -> Result<Option<DetectedManipulation>> {
-        let jpeg_analyzer = JpegAnalyzer::new();
-        let result = jpeg_analyzer.analyze(image)?;
+        let result = JpegAnalyzer::new().analyze(image)?;
 
         if result.double_compression_likelihood > 0.6 {
             Ok(Some(DetectedManipulation {
@@ -299,61 +261,17 @@ impl TamperingDetector {
                 _ => Rgb([0, 255, 255]),
             };
 
-            self.draw_detection(
-                &mut vis,
-                &manipulation.region,
-                color,
-                &manipulation.confidence,
-            );
+            self.draw_detection(&mut vis, &manipulation.region, color, manipulation.confidence);
         }
 
         vis
     }
 
-    fn draw_detection(
-        &self,
-        image: &mut RgbImage,
-        region: &SRegion,
-        color: Rgb<u8>,
-        confidence: &f64,
-    ) {
-        let (width, height) = image.dimensions();
-        let thickness = (*confidence * 4.0) as u32 + 1;
+    fn draw_detection(&self, image: &mut RgbImage, region: &SRegion, color: Rgb<u8>, confidence: f64) {
+        let thickness = (confidence * 4.0) as u32 + 1;
 
-        for t in 0..thickness {
-            for x in region.x.saturating_sub(t)..(region.x + region.width + t).min(width) {
-                if region.y >= t {
-                    image.put_pixel(x, region.y - t, color);
-                }
-                let bottom_y = region.y + region.height + t;
-                if bottom_y < height {
-                    image.put_pixel(x, bottom_y, color);
-                }
-            }
-
-            for y in region.y.saturating_sub(t)..(region.y + region.height + t).min(height) {
-                if region.x >= t {
-                    image.put_pixel(region.x - t, y, color);
-                }
-                let right_x = region.x + region.width + t;
-                if right_x < width {
-                    image.put_pixel(right_x, y, color);
-                }
-            }
-        }
-
-        let alpha = (*confidence * 0.3) as f32;
-        for y in region.y..(region.y + region.height).min(height) {
-            for x in region.x..(region.x + region.width).min(width) {
-                let original = image.get_pixel(x, y);
-                let blended = Rgb([
-                    ((1.0 - alpha) * original[0] as f32 + alpha * color[0] as f32) as u8,
-                    ((1.0 - alpha) * original[1] as f32 + alpha * color[1] as f32) as u8,
-                    ((1.0 - alpha) * original[2] as f32 + alpha * color[2] as f32) as u8,
-                ]);
-                image.put_pixel(x, y, blended);
-            }
-        }
+        draw::fill(image, region, color, (confidence * 0.3) as f32);
+        draw::rect(image, region, color, thickness);
     }
 }
 
@@ -423,12 +341,52 @@ impl Detector for TamperingDetector {
     }
 
     fn description(&self) -> &str {
-        "Combines multiple detection methods to identify copy-move forgey, splicing, retouching, and other forms of image manipulation"
+        "Combines multiple detection methods to identify copy-move forgery, splicing, retouching, and other forms of image manipulation"
     }
 }
 
 impl Default for TamperingDetector {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use image::{Rgb, RgbImage};
+
+    use super::*;
+
+    fn textured(width: u32, height: u32) -> DynamicImage {
+        let mut image = RgbImage::new(width, height);
+        for (x, y, pixel) in image.enumerate_pixels_mut() {
+            let v = (((x * 19) ^ (y * 7)) % 256) as u8;
+            *pixel = Rgb([v, v, v]);
+        }
+        DynamicImage::ImageRgb8(image)
+    }
+
+    #[test]
+    fn detected_regions_stay_within_the_image() {
+        // 100 is not a multiple of the 16 px block size, so the trailing blocks
+        // are clipped; the blur sweep used to report over-tall regions here.
+        let result = TamperingDetector::new().detect(&textured(100, 100)).unwrap();
+
+        for manipulation in &result.manipulations {
+            assert!(manipulation.region.right() <= 100, "{:?}", manipulation.region);
+            assert!(manipulation.region.bottom() <= 100, "{:?}", manipulation.region);
+        }
+    }
+
+    #[test]
+    fn overall_score_is_bounded() {
+        let result = TamperingDetector::new().detect(&textured(96, 128)).unwrap();
+        assert!((0.0..=1.0).contains(&result.overall_score));
+    }
+
+    #[test]
+    fn visualization_matches_the_input_size() {
+        let result = TamperingDetector::new().detect(&textured(96, 64)).unwrap();
+        assert_eq!(result.visualization.dimensions(), (96, 64));
     }
 }

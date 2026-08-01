@@ -3,7 +3,7 @@ use image::{DynamicImage, GrayImage, Luma};
 use crate::{
     NoiseResult, SRegion,
     error::Result,
-    image_utils::{gaussian_blur_3x3, rgb_to_gray},
+    image_utils::{clipped_blocks, gaussian_blur_3x3, median, rgb_to_gray},
 };
 
 pub struct NoiseAnalyzer {
@@ -20,7 +20,12 @@ impl NoiseAnalyzer {
     }
 
     pub fn with_block_size(mut self, size: u32) -> Self {
-        self.block_size = size;
+        self.block_size = size.max(1);
+        self
+    }
+
+    pub fn with_sensitivity(mut self, sensitivity: f64) -> Self {
+        self.sensitivity = sensitivity.max(1.0);
         self
     }
 
@@ -33,7 +38,7 @@ impl NoiseAnalyzer {
         let estimated_noise_level = self.estimate_noise_level(&noise_map);
 
         let (anomalous_regions, inconsistency_score) =
-            self.find_anomlaies(&local_variance_map, estimated_noise_level);
+            self.find_anomalies(&local_variance_map, estimated_noise_level);
 
         Ok(NoiseResult {
             noise_map,
@@ -53,32 +58,35 @@ impl NoiseAnalyzer {
             for x in 0..width {
                 let orig = gray.get_pixel(x, y)[0] as i32;
                 let blur = blurred.get_pixel(x, y)[0] as i32;
-                let diff = (orig - blur).abs() as u8;
-                noise.put_pixel(x, y, Luma([diff]));
+                noise.put_pixel(x, y, Luma([(orig - blur).unsigned_abs().min(255) as u8]));
             }
         }
 
         noise
     }
 
+    /// Local standard deviation over a window centred on each pixel.
     fn calculate_local_variance(&self, gray: &GrayImage) -> GrayImage {
         let (width, height) = gray.dimensions();
         let mut variance_map = GrayImage::new(width, height);
-        let half_block = self.block_size / 2;
+        let half_block = (self.block_size / 2) as i32;
 
         for y in 0..height {
             for x in 0..width {
                 let mut sum = 0.0;
                 let mut sum_sq = 0.0;
-                let mut count = 0;
+                let mut count = 0u32;
 
-                for dy in 0..self.block_size {
-                    for dx in 0..self.block_size {
-                        let px = x.saturating_sub(half_block) + dx;
-                        let py = y.saturating_sub(half_block) + dy;
+                // Iterate signed offsets so the window stays centred at the
+                // borders; `x.saturating_sub(half) + dx` biased it rightwards
+                // and downwards along the top and left edges.
+                for dy in -half_block..=half_block {
+                    for dx in -half_block..=half_block {
+                        let px = x as i32 + dx;
+                        let py = y as i32 + dy;
 
-                        if px < width && py < height {
-                            let val = gray.get_pixel(px, py)[0] as f64;
+                        if px >= 0 && px < width as i32 && py >= 0 && py < height as i32 {
+                            let val = gray.get_pixel(px as u32, py as u32)[0] as f64;
                             sum += val;
                             sum_sq += val * val;
                             count += 1;
@@ -88,7 +96,7 @@ impl NoiseAnalyzer {
 
                 if count > 0 {
                     let mean = sum / count as f64;
-                    let variance = (sum_sq / count as f64) - (mean * mean);
+                    let variance = (sum_sq / count as f64 - mean * mean).max(0.0);
                     let std_dev = variance.sqrt().min(255.0);
                     variance_map.put_pixel(x, y, Luma([std_dev as u8]));
                 }
@@ -98,68 +106,48 @@ impl NoiseAnalyzer {
         variance_map
     }
 
+    /// Robust noise estimate: median absolute deviation scaled to a Gaussian sigma.
     fn estimate_noise_level(&self, noise_map: &GrayImage) -> f64 {
-        let mut values = noise_map.pixels().map(|p| p[0] as f64).collect::<Vec<_>>();
+        let values: Vec<f64> = noise_map.pixels().map(|p| p[0] as f64).collect();
 
-        values.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        if values.is_empty() {
+            return 0.0;
+        }
 
-        let median = if values.len() % 2 == 0 {
-            (values[values.len() / 2 - 1] + values[values.len() / 2]) / 2.0
-        } else {
-            values[values.len() / 2]
-        };
+        let centre = median(&values);
+        let deviations: Vec<f64> = values.iter().map(|&v| (v - centre).abs()).collect();
 
-        let mut deviations = values
-            .iter()
-            .map(|&v| (v - median).abs())
-            .collect::<Vec<_>>();
-        deviations.sort_by(|a, b| a.partial_cmp(b).unwrap());
-
-        let mad = if deviations.len() % 2 == 0 {
-            (deviations[deviations.len() / 2 - 1] + deviations[deviations.len() / 2]) / 2.0
-        } else {
-            deviations[deviations.len() / 2]
-        };
-
-        mad * 1.4826
+        median(&deviations) * 1.4826
     }
 
-    fn find_anomlaies(&self, variance_map: &GrayImage, global_noise: f64) -> (Vec<SRegion>, f64) {
+    fn find_anomalies(&self, variance_map: &GrayImage, global_noise: f64) -> (Vec<SRegion>, f64) {
         let (width, height) = variance_map.dimensions();
-        let mut regions = Vec::new();
-        let mut anomaly_count = 0;
-        let mut total_blocks = 0;
 
         let threshold_high = global_noise * self.sensitivity;
         let threshold_low = global_noise / self.sensitivity;
 
-        for by in (0..height).step_by(self.block_size as usize) {
-            for bx in (0..width).step_by(self.block_size as usize) {
-                let mut block_sum = 0.0;
-                let mut count = 0;
+        let mut regions = Vec::new();
+        let mut total_blocks = 0u32;
 
-                for y in by..(by + self.block_size).min(height) {
-                    for x in bx..(bx + self.block_size).min(width) {
-                        block_sum += variance_map.get_pixel(x, y)[0] as f64;
-                        count += 1;
-                    }
-                }
+        for block in clipped_blocks(width, height, self.block_size, self.block_size) {
+            total_blocks += 1;
 
-                let block_mean = block_sum / count as f64;
-                total_blocks += 1;
+            let sum: f64 = block
+                .pixels()
+                .map(|(x, y)| variance_map.get_pixel(x, y)[0] as f64)
+                .sum();
+            let block_mean = sum / block.area() as f64;
 
-                if block_mean > threshold_high || block_mean < threshold_low {
-                    anomaly_count += 1;
-                    regions.push(SRegion {
-                        x: bx,
-                        y: by,
-                        width: self.block_size.min(width - bx),
-                        height: self.block_size.midpoint(height - by),
-                    });
-                }
+            if block_mean > threshold_high || block_mean < threshold_low {
+                regions.push(block);
             }
         }
-        let inconsistency_score = anomaly_count as f64 / total_blocks as f64;
+
+        let inconsistency_score = if total_blocks == 0 {
+            0.0
+        } else {
+            regions.len() as f64 / total_blocks as f64
+        };
 
         (regions, inconsistency_score)
     }
@@ -168,5 +156,34 @@ impl NoiseAnalyzer {
 impl Default for NoiseAnalyzer {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use image::{Rgb, RgbImage};
+
+    use super::*;
+
+    #[test]
+    fn anomalous_regions_stay_inside_the_image() {
+        // 100 is not a multiple of the 16px block size, so the trailing blocks
+        // are clipped. A `midpoint` typo used to average the block size with
+        // the remaining height and report regions running off the bottom edge.
+        let image = DynamicImage::ImageRgb8(RgbImage::from_pixel(100, 100, Rgb([10, 10, 10])));
+        let result = NoiseAnalyzer::new().analyze(&image).unwrap();
+
+        for region in &result.anomalous_regions {
+            assert!(region.right() <= 100, "{region:?} overruns the width");
+            assert!(region.bottom() <= 100, "{region:?} overruns the height");
+        }
+    }
+
+    #[test]
+    fn inconsistency_score_is_a_ratio() {
+        let image = DynamicImage::ImageRgb8(RgbImage::from_pixel(64, 64, Rgb([128, 128, 128])));
+        let result = NoiseAnalyzer::new().analyze(&image).unwrap();
+
+        assert!((0.0..=1.0).contains(&result.inconsistency_score));
     }
 }

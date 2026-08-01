@@ -1,6 +1,13 @@
 use image::{DynamicImage, GrayImage, Luma};
 
-use crate::{SRegion, error::Result, image_utils::rgb_to_gray};
+use crate::{
+    SRegion,
+    error::Result,
+    image_utils::{
+        clipped_blocks, ensure_min_dimensions, full_blocks, mean_and_variance, rgb_to_gray,
+    },
+    region::merge_regions,
+};
 
 #[derive(Debug, Clone)]
 pub struct PcaConfig {
@@ -41,6 +48,7 @@ pub struct PcaAnalyzer {
     config: PcaConfig,
 }
 
+#[allow(clippy::needless_range_loop)]
 impl PcaAnalyzer {
     pub fn new() -> Self {
         Self::with_config(PcaConfig::default())
@@ -55,11 +63,7 @@ impl PcaAnalyzer {
         let gray = rgb_to_gray(&rgb);
         let (width, height) = gray.dimensions();
 
-        if width < self.config.block_size * 2 || height < self.config.block_size * 2 {
-            return Err(crate::error::ForensicsError::ImageTooSmall(
-                self.config.block_size * 2,
-            ));
-        }
+        ensure_min_dimensions(width, height, self.config.block_size * 2)?;
 
         let (patches, patch_positions) = self.extract_patches(&gray);
 
@@ -69,38 +73,36 @@ impl PcaAnalyzer {
             ));
         }
 
-        let (prinicpal_components, eigenvalues, mean) = self.compute_pca(&patches)?;
+        let pca = self.compute_pca(&patches)?;
 
-        let total_variance = eigenvalues.iter().sum::<f64>();
-        let variance_ratios = eigenvalues
+        // Fraction of the *total* variance each component explains, so the
+        // ratios legitimately sum to less than 1.
+        let variance_ratios = pca
+            .eigenvalues
             .iter()
             .map(|&ev| {
-                if total_variance > 0.0 {
-                    ev / total_variance
+                if pca.total_variance > 0.0 {
+                    (ev / pca.total_variance).clamp(0.0, 1.0)
                 } else {
                     0.0
                 }
             })
             .collect::<Vec<_>>();
 
-        let projections = self.project_patches(&patches, &prinicpal_components, &mean);
+        let projections = self.project_patches(&patches, &pca.components, &pca.mean);
 
         let pc1_map = self.create_component_map(width, height, &patch_positions, &projections, 0);
         let pc2_map = self.create_component_map(width, height, &patch_positions, &projections, 1);
         let pc3_map = self.create_component_map(width, height, &patch_positions, &projections, 2);
 
-        let reconstruction_errors = self.compute_reconstruction_errors(
-            &patches,
-            &prinicpal_components,
-            &mean,
-            &projections,
-        );
+        let reconstruction_errors =
+            self.compute_reconstruction_errors(&patches, &pca.components, &pca.mean, &projections);
 
         let anomaly_map =
             self.create_anomaly_map(width, height, &patch_positions, &reconstruction_errors);
 
         let anomalous_regions =
-            self.find_anomalous_regions(&anomaly_map, &reconstruction_errors, &patch_positions);
+            self.find_anomalous_regions(width, height, &reconstruction_errors, &patch_positions);
 
         let overall_anomaly_score = self.calculate_overall_anomaly_score(&reconstruction_errors);
         let manipulation_probability = self.calculate_manipulation_probability(
@@ -130,12 +132,9 @@ impl PcaAnalyzer {
         let mut patches = Vec::new();
         let mut positions = Vec::new();
 
-        for y in (0..height - patch_size).step_by(stride as usize) {
-            for x in (0..width - patch_size).step_by(stride as usize) {
-                let patch = self.extract_single_patch(gray, x, y);
-                patches.push(patch);
-                positions.push((x, y));
-            }
+        for region in full_blocks(width, height, patch_size, stride) {
+            patches.push(self.extract_single_patch(gray, region.x, region.y));
+            positions.push((region.x, region.y));
         }
 
         (patches, positions)
@@ -155,7 +154,7 @@ impl PcaAnalyzer {
         patch
     }
 
-    fn compute_pca(&self, patches: &[Vec<f64>]) -> Result<(Vec<Vec<f64>>, Vec<f64>, Vec<f64>)> {
+    fn compute_pca(&self, patches: &[Vec<f64>]) -> Result<Pca> {
         let n_samples = patches.len();
         let n_features = patches[0].len();
 
@@ -215,10 +214,21 @@ impl PcaAnalyzer {
             }
         }
 
+        // The trace is the total variance across all features. Summing only the
+        // extracted eigenvalues, as the caller previously did, forced the
+        // reported ratios to sum to 1.0 and made "explained variance"
+        // meaningless.
+        let total_variance: f64 = (0..n_features).map(|i| covariance[i][i]).sum();
+
         let (eigenvectors, eigenvalues) =
             self.power_iteration(&covariance, self.config.num_components.min(n_features));
 
-        Ok((eigenvectors, eigenvalues, mean))
+        Ok(Pca {
+            components: eigenvectors,
+            eigenvalues,
+            mean,
+            total_variance,
+        })
     }
 
     fn power_iteration(
@@ -341,6 +351,42 @@ impl PcaAnalyzer {
             .collect()
     }
 
+    /// Average one scalar per patch over the pixels each patch covers.
+    ///
+    /// Returns `(sums, counts)` as flat row-major buffers. Overlapping patches
+    /// used to be accumulated into a `Vec<Vec<Vec<f64>>>`, i.e. one heap
+    /// allocation per pixel — twelve million of them on a 12 MP image, repeated
+    /// for each of the three component maps and again for the anomaly map. A
+    /// running sum and count needs two flat buffers and no per-pixel allocation.
+    fn accumulate_per_pixel(
+        &self,
+        width: u32,
+        height: u32,
+        positions: &[(u32, u32)],
+        values: impl Fn(usize) -> Option<f64>,
+    ) -> (Vec<f64>, Vec<u32>) {
+        let len = (width as usize) * (height as usize);
+        let mut sums = vec![0.0f64; len];
+        let mut counts = vec![0u32; len];
+        let patch_size = self.config.patch_size;
+
+        for (i, &(x, y)) in positions.iter().enumerate() {
+            let Some(value) = values(i) else {
+                continue;
+            };
+
+            let patch = SRegion::new(x, y, patch_size, patch_size).clamp_to(width, height);
+
+            for (px, py) in patch.pixels() {
+                let index = (py as usize) * (width as usize) + px as usize;
+                sums[index] += value;
+                counts[index] += 1;
+            }
+        }
+
+        (sums, counts)
+    }
+
     fn create_component_map(
         &self,
         width: u32,
@@ -350,49 +396,34 @@ impl PcaAnalyzer {
         component_idx: usize,
     ) -> GrayImage {
         let mut map = GrayImage::new(width, height);
-        let mut value_map = vec![vec![Vec::new(); width as usize]; height as usize];
-        let patch_size = self.config.patch_size;
 
-        for (i, &(x, y)) in positions.iter().enumerate() {
-            if component_idx < projections[i].len() {
-                let value = projections[i][component_idx];
+        let (sums, counts) = self.accumulate_per_pixel(width, height, positions, |i| {
+            projections[i].get(component_idx).copied()
+        });
 
-                for dy in 0..patch_size {
-                    for dx in 0..patch_size {
-                        let px = (x + dx) as usize;
-                        let py = (y + dy) as usize;
-                        if px < width as usize && py < height as usize {
-                            value_map[py][px].push(value);
-                        }
-                    }
-                }
-            }
-        }
+        let mut averages: Vec<f64> = sums
+            .iter()
+            .zip(counts.iter())
+            .filter(|(_, count)| **count > 0)
+            .map(|(&sum, &count)| sum / count as f64)
+            .collect();
 
-        let mut all_values = Vec::new();
-        for row in &value_map {
-            for cell in row {
-                if !cell.is_empty() {
-                    let avg = cell.iter().sum::<f64>() / cell.len() as f64;
-                    all_values.push(avg);
-                }
-            }
-        }
-
-        if all_values.is_empty() {
+        if averages.is_empty() {
             return map;
         }
 
-        all_values.sort_by(|a, b| a.partial_cmp(b).unwrap());
-        let min_val = all_values[all_values.len() / 20];
-        let max_val = all_values[all_values.len() * 19 / 20];
+        // Stretch between the 5th and 95th percentiles so a few outliers do not
+        // flatten the whole map.
+        averages.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+        let min_val = averages[averages.len() / 20];
+        let max_val = averages[averages.len() * 19 / 20];
         let range = (max_val - min_val).max(1e-10);
 
         for y in 0..height {
             for x in 0..width {
-                let cell = &value_map[y as usize][x as usize];
-                if !cell.is_empty() {
-                    let avg = cell.iter().sum::<f64>() / cell.len() as f64;
+                let index = (y as usize) * (width as usize) + x as usize;
+                if counts[index] > 0 {
+                    let avg = sums[index] / counts[index] as f64;
                     let normalized = ((avg - min_val) / range).clamp(0.0, 1.0);
                     map.put_pixel(x, y, Luma([(normalized * 255.0) as u8]));
                 }
@@ -410,157 +441,83 @@ impl PcaAnalyzer {
         errors: &[f64],
     ) -> GrayImage {
         let mut map = GrayImage::new(width, height);
-        let mut error_map = vec![vec![Vec::new(); width as usize]; height as usize];
-        let patch_size = self.config.patch_size;
 
-        for (i, &(x, y)) in positions.iter().enumerate() {
-            for dy in 0..patch_size {
-                for dx in 0..patch_size {
-                    let px = (x + dx) as usize;
-                    let py = (y + dy) as usize;
-                    if px < width as usize && py < height as usize {
-                        error_map[py][px].push(errors[i]);
-                    }
-                }
-            }
-        }
+        let (sums, counts) =
+            self.accumulate_per_pixel(width, height, positions, |i| errors.get(i).copied());
 
-        let mean_error = errors.iter().sum::<f64>() / errors.len() as f64;
-        let variance =
-            errors.iter().map(|e| (e - mean_error).powi(2)).sum::<f64>() / errors.len() as f64;
+        let (mean_error, variance) = mean_and_variance(errors);
         let std_dev = variance.sqrt();
 
         for y in 0..height {
             for x in 0..width {
-                let cell = &error_map[y as usize][x as usize];
-                if !cell.is_empty() {
-                    let avg = cell.iter().sum::<f64>() / cell.len() as f64;
-
-                    let z_score = if std_dev > 0.0 {
-                        (avg - mean_error) / std_dev
-                    } else {
-                        0.0
-                    };
-
-                    let normalized = (z_score / 5.0 + 0.5).clamp(0.0, 1.0);
-                    map.put_pixel(x, y, Luma([(normalized * 255.0) as u8]));
+                let index = (y as usize) * (width as usize) + x as usize;
+                if counts[index] == 0 {
+                    continue;
                 }
+
+                let avg = sums[index] / counts[index] as f64;
+                let z_score = if std_dev > 0.0 {
+                    (avg - mean_error) / std_dev
+                } else {
+                    0.0
+                };
+
+                let normalized = (z_score / 5.0 + 0.5).clamp(0.0, 1.0);
+                map.put_pixel(x, y, Luma([(normalized * 255.0) as u8]));
             }
         }
 
         map
     }
 
+    /// Flag blocks where reconstruction error is concentrated.
+    ///
+    /// The threshold is derived from the error distribution and then actually
+    /// applied. Previously it was computed and discarded in favour of the magic
+    /// constant `128.0 + anomaly_threshold * 30.0` tested against the rendered
+    /// map, so `anomaly_threshold` bore no relationship to the data and the
+    /// `errors`/`positions` arguments went unused.
     fn find_anomalous_regions(
         &self,
-        anomaly_map: &GrayImage,
+        width: u32,
+        height: u32,
         errors: &[f64],
-        postions: &[(u32, u32)],
+        positions: &[(u32, u32)],
     ) -> Vec<SRegion> {
-        let (width, height) = anomaly_map.dimensions();
+        if errors.is_empty() {
+            return Vec::new();
+        }
+
+        let (mean_error, variance) = mean_and_variance(errors);
+        let threshold = mean_error + self.config.anomaly_threshold * variance.sqrt();
+
+        let patch_size = self.config.patch_size;
         let block_size = self.config.block_size;
 
-        let mean_error = errors.iter().sum::<f64>() / errors.len() as f64;
-        let variance =
-            errors.iter().map(|e| (e - mean_error).powi(2)).sum::<f64>() / errors.len() as f64;
-        let std_dev = variance.sqrt();
-        let threshold = mean_error + self.config.anomaly_threshold * std_dev;
+        let regions = clipped_blocks(width, height, block_size, block_size)
+            .filter(|block| {
+                let mut anomalous = 0usize;
+                let mut total = 0usize;
 
-        let mut regions = Vec::new();
-
-        for by in (0..height).step_by(block_size as usize) {
-            for bx in (0..width).step_by(block_size as usize) {
-                let block_w = block_size.min(width - bx);
-                let block_h = block_size.min(height - by);
-
-                let mut block_sum = 0.0;
-                let mut count = 0;
-
-                for y in by..(by + block_h) {
-                    for x in bx..(bx + block_w) {
-                        block_sum += anomaly_map.get_pixel(x, y)[0] as f64;
-                        count += 1;
-                    }
-                }
-
-                let block_avg = block_sum / count as f64;
-
-                if block_avg > 128.0 + self.config.anomaly_threshold * 30.0 {
-                    regions.push(SRegion {
-                        x: bx,
-                        y: by,
-                        width: block_w,
-                        height: block_h,
-                    });
-                }
-            }
-        }
-
-        self.merge_regions(regions)
-    }
-
-    fn merge_regions(&self, regions: Vec<SRegion>) -> Vec<SRegion> {
-        if regions.is_empty() {
-            return regions;
-        }
-
-        let mut merged = Vec::new();
-        let mut used = vec![false; regions.len()];
-
-        for i in 0..regions.len() {
-            if used[i] {
-                continue;
-            }
-
-            let mut current = regions[i];
-            used[i] = true;
-
-            loop {
-                let mut found = false;
-                for j in 0..regions.len() {
-                    if used[j] {
+                for (&(px, py), &error) in positions.iter().zip(errors.iter()) {
+                    let patch = SRegion::new(px, py, patch_size, patch_size);
+                    if !patch.overlaps(block) {
                         continue;
                     }
 
-                    if self.regions_adjacent(&current, &regions[j]) {
-                        current = self.merge_two_regions(&current, &regions[j]);
-                        used[j] = true;
-                        found = true;
+                    total += 1;
+                    if error > threshold {
+                        anomalous += 1;
                     }
                 }
 
-                if !found {
-                    break;
-                }
-            }
+                // A block is anomalous when a fifth of the patches covering it
+                // exceed the threshold.
+                total > 0 && anomalous * 5 >= total
+            })
+            .collect();
 
-            merged.push(current);
-        }
-
-        merged
-    }
-
-    fn regions_adjacent(&self, a: &SRegion, b: &SRegion) -> bool {
-        let gap = self.config.block_size / 2;
-
-        !(a.x + a.width + gap < b.x
-            || b.x + b.width + gap < a.x
-            || a.y + a.height + gap < b.y
-            || b.y + b.height + gap < a.y)
-    }
-
-    fn merge_two_regions(&self, a: &SRegion, b: &SRegion) -> SRegion {
-        let x = a.x.min(b.x);
-        let y = a.y.min(b.y);
-        let x2 = (a.x + a.width).max(b.x + b.width);
-        let y2 = (a.y + a.height).max(b.y + b.height);
-
-        SRegion {
-            x,
-            y,
-            width: x2 - x,
-            height: y2 - y,
-        }
+        merge_regions(regions, block_size / 2)
     }
 
     fn calculate_overall_anomaly_score(&self, errors: &[f64]) -> f64 {
@@ -568,8 +525,7 @@ impl PcaAnalyzer {
             return 0.0;
         }
 
-        let mean = errors.iter().sum::<f64>() / errors.len() as f64;
-        let variance = errors.iter().map(|e| (e - mean).powi(2)).sum::<f64>() / errors.len() as f64;
+        let (mean, variance) = mean_and_variance(errors);
         let std_dev = variance.sqrt();
 
         let threshold = mean + self.config.anomaly_threshold * std_dev;
@@ -588,11 +544,15 @@ impl PcaAnalyzer {
         width: u32,
         height: u32,
     ) -> f64 {
-        let total_pixels = width * height;
+        let total_pixels = width as f64 * height as f64;
 
-        let anomalous_pixels = regions.iter().map(|r| r.width * r.height).sum::<u32>();
+        let anomalous_pixels: u64 = regions.iter().map(|r| r.area()).sum();
 
-        let coverage = anomalous_pixels as f64 / total_pixels as f64;
+        let coverage = if total_pixels > 0.0 {
+            anomalous_pixels as f64 / total_pixels
+        } else {
+            0.0
+        };
 
         let manipulation_prob = if coverage > 0.5 {
             anomaly_score * 0.3
@@ -606,8 +566,83 @@ impl PcaAnalyzer {
     }
 }
 
+/// Outcome of the covariance decomposition over the extracted patches.
+struct Pca {
+    components: Vec<Vec<f64>>,
+    eigenvalues: Vec<f64>,
+    mean: Vec<f64>,
+    /// Trace of the covariance matrix: variance across all features.
+    total_variance: f64,
+}
+
 impl Default for PcaAnalyzer {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use image::{Rgb, RgbImage};
+
+    use super::*;
+
+    fn textured(width: u32, height: u32) -> DynamicImage {
+        let mut image = RgbImage::new(width, height);
+        for (x, y, pixel) in image.enumerate_pixels_mut() {
+            let v = (((x * 11) ^ (y * 23)) % 256) as u8;
+            *pixel = Rgb([v, v, v]);
+        }
+        DynamicImage::ImageRgb8(image)
+    }
+
+    fn small_config() -> PcaConfig {
+        PcaConfig {
+            block_size: 16,
+            ..PcaConfig::default()
+        }
+    }
+
+    #[test]
+    fn variance_ratios_do_not_sum_to_one_by_construction() {
+        let analyzer = PcaAnalyzer::with_config(small_config());
+        let result = analyzer.analyze(&textured(128, 128)).unwrap();
+
+        let total: f64 = result.variance_ratios.iter().sum();
+
+        // Three components out of 64 features cannot explain everything.
+        // Normalising by the extracted eigenvalues alone forced this to 1.0.
+        assert!(total <= 1.0 + 1e-9, "ratios sum to {total}");
+        assert!(
+            result.variance_ratios.iter().all(|r| (0.0..=1.0).contains(r)),
+            "ratios out of range: {:?}",
+            result.variance_ratios
+        );
+    }
+
+    #[test]
+    fn anomalous_regions_stay_in_bounds() {
+        let analyzer = PcaAnalyzer::with_config(small_config());
+        let result = analyzer.analyze(&textured(100, 140)).unwrap();
+
+        for region in &result.anomalous_regions {
+            assert!(region.right() <= 100, "{region:?}");
+            assert!(region.bottom() <= 140, "{region:?}");
+        }
+    }
+
+    #[test]
+    fn component_maps_match_the_image_size() {
+        let analyzer = PcaAnalyzer::with_config(small_config());
+        let result = analyzer.analyze(&textured(96, 64)).unwrap();
+
+        assert_eq!(result.pc1_map.dimensions(), (96, 64));
+        assert_eq!(result.anomaly_map.dimensions(), (96, 64));
+    }
+
+    #[test]
+    fn undersized_images_error() {
+        let image = DynamicImage::ImageRgb8(RgbImage::new(64, 64));
+        assert!(PcaAnalyzer::new().analyze(&image).is_err());
     }
 }
