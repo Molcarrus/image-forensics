@@ -1,28 +1,38 @@
-<nav class="sidebar-nav">
-    <h4>Getting Started</h4>
+{% comment %}
+Docs sidebar.
+
+`page.permalink` comes back without a leading slash for most pages but with one
+where a page sets `permalink:` explicitly, so normalise before comparing:
+prepend a slash and collapse any resulting double.
+{% endcomment %}
+{% assign here = page.permalink | prepend: "/" | replace: "//", "/" %}
+
+<nav class="sidebar-nav" aria-label="Documentation">
+    <p class="sidebar-heading">Getting Started</p>
     <ul>
-        <li><a href="/docs/installation/">Installation</a></li>
-        <li><a href="/docs/configuration/">Configuration</a></li>
+        <li><a href="/docs/installation/"{% if here == "/docs/installation/" %} class="is-current" aria-current="page"{% endif %}>Installation</a></li>
+        <li><a href="/docs/configuration/"{% if here == "/docs/configuration/" %} class="is-current" aria-current="page"{% endif %}>Configuration</a></li>
     </ul>
 
-    <h4>Analysis Modules</h4>
+    <p class="sidebar-heading">Analysis Modules</p>
     <ul>
-        <li><a href="/docs/modules/">Overview</a></li>
+        <li><a href="/docs/modules/"{% if here == "/docs/modules/" %} class="is-current" aria-current="page"{% endif %}>Overview</a></li>
         {% for module in site.data.modules.modules %}
-        <li><a href="/docs/modules/{{ module.slug }}/">{{ module.name }}</a></li>
+        {% assign target = "/docs/modules/" | append: module.slug | append: "/" %}
+        <li><a href="{{ target }}"{% if here == target %} class="is-current" aria-current="page"{% endif %}>{{ module.name }}</a></li>
         {% endfor %}
-        <li><a href="/docs/modules/metadata/">Metadata (EXIF)</a></li>
+        <li><a href="/docs/modules/metadata/"{% if here == "/docs/modules/metadata/" %} class="is-current" aria-current="page"{% endif %}>Metadata (EXIF)</a></li>
     </ul>
 
-    <h4>API Reference</h4>
+    <p class="sidebar-heading">API Reference</p>
     <ul>
-        <li><a href="/docs/api/types/">Types</a></li>
-        <li><a href="/docs/api/traits/">Traits</a></li>
-        <li><a href="/docs/api/errors/">Errors</a></li>
+        <li><a href="/docs/api/types/"{% if here == "/docs/api/types/" %} class="is-current" aria-current="page"{% endif %}>Types</a></li>
+        <li><a href="/docs/api/traits/"{% if here == "/docs/api/traits/" %} class="is-current" aria-current="page"{% endif %}>Traits</a></li>
+        <li><a href="/docs/api/errors/"{% if here == "/docs/api/errors/" %} class="is-current" aria-current="page"{% endif %}>Errors</a></li>
     </ul>
 
-    <h4>Meta</h4>
+    <p class="sidebar-heading">Meta</p>
     <ul>
-        <li><a href="/docs/changelog/">Changelog</a></li>
+        <li><a href="/docs/changelog/"{% if here == "/docs/changelog/" %} class="is-current" aria-current="page"{% endif %}>Changelog</a></li>
     </ul>
 </nav>

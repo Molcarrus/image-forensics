@@ -1,41 +1,33 @@
 {% include "head.liquid" %}
-<article class="post">
-    <header class="post-header">
+<article class="post prose">
+    <header class="page-head">
+        <p class="eyebrow"><a href="/posts/">Blog</a></p>
         <h1>{{ page.title }}</h1>
+        {% if page.description %}<p class="lede">{{ page.description }}</p>{% endif %}
+
         <div class="post-meta">
             {% if page.published_date %}
             <time datetime="{{ page.published_date | date: '%Y-%m-%d' }}">
-                {{ page.published_date | date: "%B %d, %Y" }}
+                {{ page.published_date | date: "%B %e, %Y" }}
             </time>
             {% endif %}
-            {% if page.data.category %}
-            <span class="category">{{ page.data.category }}</span>
-            {% endif %}
-            {% if page.data.reading_time %}
-            <span class="reading-time">{{ page.data.reading_time }} min read</span>
-            {% endif %}
+            {% if page.data.category %}<span class="chip">{{ page.data.category }}</span>{% endif %}
+            {% if page.data.reading_time %}<span>{{ page.data.reading_time }} min read</span>{% endif %}
         </div>
-        {% if page.data.tags %}
-        <div class="tags">
-            {% for tag in page.data.tags %}
-            <span class="tag">{{ tag }}</span>
-            {% endfor %}
-        </div>
-        {% endif %}
     </header>
 
-    <div class="post-content">
-        {{ page.content }}
-    </div>
+    {{ page.content }}
 
     <footer class="post-footer">
+        {% if page.data.tags %}
+        <div class="tags">
+            {% for tag in page.data.tags %}<span class="chip">{{ tag }}</span>{% endfor %}
+        </div>
+        {% endif %}
+
         <div class="post-nav">
-            {% if page.data.prev %}
-            <a href="{{ page.data.prev }}" class="prev">&larr; Previous</a>
-            {% endif %}
-            {% if page.data.next %}
-            <a href="{{ page.data.next }}" class="next">Next &rarr;</a>
-            {% endif %}
+            {% if page.data.prev %}<a href="{{ page.data.prev }}">&larr; Previous</a>{% endif %}
+            {% if page.data.next %}<a href="{{ page.data.next }}" class="next">Next &rarr;</a>{% endif %}
         </div>
     </footer>
 </article>

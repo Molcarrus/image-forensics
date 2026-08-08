@@ -2,7 +2,7 @@
 layout: docs.liquid
 permalink: "/docs/modules/"
 title: Analysis Modules
-description: Seventeen independent analyses, what each detects, and how to combine them.
+description: Sixteen analysis modules plus EXIF metadata — what each detects, and how to combine them.
 ---
 
 Every module is independent: it takes an `image::DynamicImage`, returns its own

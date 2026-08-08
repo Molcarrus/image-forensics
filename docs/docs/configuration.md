@@ -90,7 +90,7 @@ It has been removed. Parallelism is controlled by `rayon`'s thread pool; set
 
 </div>
 
-## Minimum image sizes
+<h2 id="minimum-image-sizes">Minimum image sizes</h2>
 
 Most modules require the image to be at least twice their block size in both
 dimensions and return `ForensicsError::ImageTooSmall(n)` otherwise, where `n`

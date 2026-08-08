@@ -2,15 +2,15 @@
 layout: home.liquid
 permalink: "/"
 title: Digital image forensics for Rust
-description: A Rust library for digital image forensics — sixteen analysis modules for detecting manipulation, forgery and inconsistency in images.
+description: A Rust library for digital image forensics — sixteen analysis modules plus EXIF metadata, for detecting manipulation, forgery and inconsistency in images.
 ---
 
 <div class="hero">
 
 # Image forensics in Rust
 
-Sixteen independent analysis modules for finding the traces that editing leaves
-behind: recompression, duplicated regions, spliced composites, resampling,
+Sixteen independent analysis modules, plus EXIF metadata, for finding the
+traces that editing leaves behind: recompression, duplicated regions, spliced composites, resampling,
 broken lighting, and metadata that does not match the pixels.
 
 <div class="button-row">

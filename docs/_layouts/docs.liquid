@@ -3,10 +3,18 @@
     <aside class="docs-sidebar">
         {% include "sidebar.liquid" %}
     </aside>
-    <article class="docs-content">
-        <h1>{{ page.title }}</h1>
-        {% if page.description %}<p class="lede">{{ page.description }}</p>{% endif %}
+
+    <article class="docs-content prose">
+        <header class="page-head">
+            <h1>{{ page.title }}</h1>
+            {% if page.description %}<p class="lede">{{ page.description }}</p>{% endif %}
+        </header>
         {{ page.content }}
     </article>
+
+    <aside class="docs-toc" data-toc hidden>
+        <p class="toc-heading">On this page</p>
+        <nav aria-label="On this page"></nav>
+    </aside>
 </div>
 {% include "foot.liquid" %}

@@ -1,19 +1,47 @@
-<nav class="main-nav">
-    <ul>
-        <li><a href="/">Home</a></li>
+{% comment %}
+Navigation.
+
+The docs menu is a `<details>` disclosure rather than a hover-only dropdown:
+hover menus are unreachable on touch devices and unusable by keyboard. This
+works with no JavaScript at all.
+
+Every submenu selector below is written as `.main-nav .nav-submenu` (two
+classes) so it outranks `.main-nav ul` (one class, one type). Getting that
+wrong is what previously left the dropdown permanently open with 20px gaps
+between its items.
+{% endcomment %}
+<nav class="main-nav" aria-label="Main">
+    <ul class="nav-list">
+        <li class="nav-home"><a href="/">Home</a></li>
         <li><a href="/getting-started/">Get Started</a></li>
-        <li class="dropdown">
-            <a href="/docs/installation/">Docs</a>
-            <ul class="dropdown-menu">
-                <li><a href="/docs/installation/">Installation</a></li>
-                <li><a href="/docs/configuration/">Configuration</a></li>
-                <li><a href="/docs/modules/">Modules</a></li>
-                <li><a href="/docs/api/types/">API Reference</a></li>
-                <li><a href="/docs/changelog/">Changelog</a></li>
-            </ul>
+        <li class="nav-item-menu">
+            <details class="nav-disclosure">
+                <summary>
+                    Docs
+                    <svg class="chevron" viewBox="0 0 12 12" aria-hidden="true" focusable="false">
+                        <path d="M2.5 4.5 6 8l3.5-3.5" fill="none" stroke="currentColor"
+                              stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                </summary>
+                <ul class="nav-submenu">
+                    <li><a href="/docs/installation/">Installation</a></li>
+                    <li><a href="/docs/configuration/">Configuration</a></li>
+                    <li><a href="/docs/modules/">Analysis Modules</a></li>
+                    <li><a href="/docs/api/types/">API Reference</a></li>
+                    <li><a href="/docs/changelog/">Changelog</a></li>
+                </ul>
+            </details>
         </li>
         <li><a href="/posts/">Blog</a></li>
         <li><a href="/about/">About</a></li>
-        <li><a href="{{ site.data.repo.url }}">GitHub</a></li>
+        <li>
+            <a class="nav-external" href="{{ site.data.repo.url }}">
+                GitHub
+                <svg viewBox="0 0 12 12" aria-hidden="true" focusable="false">
+                    <path d="M4.5 2.5h5v5M9.5 2.5 3 9" fill="none" stroke="currentColor"
+                          stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+            </a>
+        </li>
     </ul>
 </nav>

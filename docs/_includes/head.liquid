@@ -5,8 +5,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{% if page.title %}{{ page.title }} &middot; {% endif %}{{ site.title }}</title>
     <meta name="description" content="{% if page.description %}{{ page.description }}{% else %}{{ site.description }}{% endif %}">
+    <meta name="color-scheme" content="dark light">
+    <meta name="theme-color" content="#0b0e14" media="(prefers-color-scheme: dark)">
+    <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
     <link rel="stylesheet" href="/assets/css/style.css">
+    <link rel="alternate" type="application/rss+xml" title="{{ site.title }}" href="/rss.xml">
+    <script src="/assets/js/docs.js" defer></script>
 </head>
 <body>
+    <a class="skip-link" href="#content">Skip to content</a>
     {% include "header.liquid" %}
-    <main class="site-main">
+    <main class="site-main" id="content">

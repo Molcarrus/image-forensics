@@ -10,6 +10,12 @@ pages:
   default:
     permalink: "/{{parent}}/{{name}}/"
 
+# The highlighter writes an inline background-color onto each <pre>, so the
+# stylesheet overrides it; code surfaces are dark in both colour schemes
+# because the token palette here is a dark one.
+syntax_highlight:
+  theme: base16-ocean.dark
+
 posts:
   dir: posts
   rss: rss.xml
