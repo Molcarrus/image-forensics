@@ -12,6 +12,20 @@ use crate::{
 /// Number of low-frequency DCT coefficients kept per block.
 const FEATURE_LEN: usize = 16;
 
+/// Finds regions duplicated within one image.
+///
+/// Copy-move forgery hides or duplicates something using material from the
+/// same photo, so the copy matches the original in noise, lighting and
+/// compression history — which defeats most cross-source detectors.
+///
+/// Blocks are compared by the low-frequency coefficients of a 2-D DCT-II,
+/// bucketed by a similarity hash and then correlated pairwise.
+///
+/// # Limitations
+///
+/// Only near-exact copies: a copy that was rotated, scaled or heavily blended
+/// after pasting will not match. Repetitive content — brickwork, windows,
+/// crowds — produces false pairs; check whether matches share a common offset.
 pub struct CopyMoveDetector {
     block_size: u32,
     similarity_threshold: f64,
@@ -32,6 +46,19 @@ struct BlockFeature {
 }
 
 impl CopyMoveDetector {
+    /// Build a detector.
+    ///
+    /// - `block_size` — side of the compared square, in pixels.
+    /// - `similarity_threshold` — minimum feature correlation, in `[0, 1]`.
+    ///   0.95 is strict; 0.90 is a sensible floor.
+    /// - `min_distance` — how far apart two blocks must be before a match
+    ///   counts, suppressing the trivial self-matches any textured region makes
+    ///   with its own neighbours.
+    ///
+    /// # Errors
+    ///
+    /// [`InvalidParameter`](crate::error::ForensicsError::InvalidParameter) for
+    /// a block size outside `4..=64`.
     pub fn new(block_size: u32, similarity_threshold: f64, min_distance: u32) -> Result<Self> {
         if !(4..=64).contains(&block_size) {
             return Err(ForensicsError::InvalidParameter(
@@ -49,11 +76,21 @@ impl CopyMoveDetector {
         })
     }
 
+    /// Blocks flatter than this are skipped entirely.
+    ///
+    /// Flat sky matches every other patch of flat sky; skipping those is what
+    /// keeps the pairwise stage tractable.
     pub fn with_variance_threshold(mut self, threshold: f64) -> Self {
         self.variance_threshold = threshold;
         self
     }
 
+    /// Run the detection.
+    ///
+    /// # Errors
+    ///
+    /// [`ImageTooSmall`](crate::error::ForensicsError::ImageTooSmall) below
+    /// twice the block size.
     pub fn detect(&self, image: &DynamicImage) -> Result<CopyMoveResult> {
         let rgb = image.to_rgb8();
         let gray = rgb_to_gray(&rgb);
@@ -84,14 +121,10 @@ impl CopyMoveDetector {
         let (width, height) = gray.dimensions();
         let step = (self.block_size / 2).max(1);
 
-        let positions: Vec<(u32, u32)> = crate::image_utils::full_blocks(
-            width,
-            height,
-            self.block_size,
-            step,
-        )
-        .map(|region| (region.x, region.y))
-        .collect();
+        let positions: Vec<(u32, u32)> =
+            crate::image_utils::full_blocks(width, height, self.block_size, step)
+                .map(|region| (region.x, region.y))
+                .collect();
 
         positions
             .par_iter()
@@ -364,11 +397,7 @@ fn hue_to_rgb(hue: f64) -> Rgb<u8> {
         _ => (1.0, 0.0, x),
     };
 
-    Rgb([
-        (r * 255.0) as u8,
-        (g * 255.0) as u8,
-        (b * 255.0) as u8,
-    ])
+    Rgb([(r * 255.0) as u8, (g * 255.0) as u8, (b * 255.0) as u8])
 }
 
 #[cfg(test)]
@@ -467,9 +496,6 @@ mod tests {
         let image = DynamicImage::ImageRgb8(RgbImage::new(20, 20));
         let result = CopyMoveDetector::new(16, 0.9, 10).unwrap().detect(&image);
 
-        assert!(matches!(
-            result,
-            Err(ForensicsError::ImageTooSmall(32))
-        ));
+        assert!(matches!(result, Err(ForensicsError::ImageTooSmall(32))));
     }
 }

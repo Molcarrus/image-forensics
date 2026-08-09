@@ -6,12 +6,25 @@ use crate::{
     image_utils::{clipped_blocks, gaussian_blur_3x3, median, rgb_to_gray},
 };
 
+/// Sensor noise consistency.
+///
+/// Extracts a noise residual, estimates the global noise floor robustly (median
+/// absolute deviation, so a large tampered region cannot drag the baseline
+/// towards itself), then flags blocks whose local variance sits far above or
+/// below it.
+///
+/// # Limitations
+///
+/// Noise is not uniform in real photographs: it rises in shadows and falls in
+/// saturated highlights. Modern phones also denoise different parts of a frame
+/// differently, and JPEG compression suppresses noise unevenly.
 pub struct NoiseAnalyzer {
     block_size: u32,
     sensitivity: f64,
 }
 
 impl NoiseAnalyzer {
+    /// Analyzer with the default 16px block and sensitivity of 2.
     pub fn new() -> Self {
         Self {
             block_size: 16,
@@ -19,16 +32,20 @@ impl NoiseAnalyzer {
         }
     }
 
+    /// Window size for local variance, and tile size for the anomaly sweep.
     pub fn with_block_size(mut self, size: u32) -> Self {
         self.block_size = size.max(1);
         self
     }
 
+    /// A block is flagged above `noise * sensitivity` or below
+    /// `noise / sensitivity`. Lower is stricter. Clamped to at least 1.
     pub fn with_sensitivity(mut self, sensitivity: f64) -> Self {
         self.sensitivity = sensitivity.max(1.0);
         self
     }
 
+    /// Run the analysis. Accepts any image size.
     pub fn analyze(&self, image: &DynamicImage) -> Result<NoiseResult> {
         let rgb = image.to_rgb8();
         let gray = rgb_to_gray(&rgb);

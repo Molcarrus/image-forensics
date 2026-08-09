@@ -7,12 +7,18 @@ use crate::{
     region::merge_regions,
 };
 
+/// Settings for [`PrnuAnalyzer`].
 #[derive(Debug, Clone)]
 pub struct PrnuConfig {
+    /// Tile for the consistency sweep. Default 64.
     pub block_size: u32,
+    /// Bilateral-filter passes in the denoiser. More removes more content and costs proportionally.
     pub wavelet_levels: usize,
+    /// Floor below which a block reads as inconsistent.
     pub correlation_threshold: f64,
+    /// Blocks flatter than this get a neutral 0.5 rather than a meaningless correlation.
     pub min_variance: f64,
+    /// Assumed noise standard deviation in the Wiener weighting.
     pub denoise_sigma: f64,
 }
 
@@ -28,39 +34,77 @@ impl Default for PrnuConfig {
     }
 }
 
+/// Output of [`PrnuAnalyzer`].
 #[derive(Debug, Clone)]
 pub struct PrnuAnalysisResult {
+    /// Extracted sensor residual, offset so mid-grey is zero.
     pub prnu_pattern: GrayImage,
+    /// Per-block agreement with the global pattern.
     pub correlation_map: GrayImage,
+    /// Blocks below the correlation threshold, merged.
     pub inconsistent_regions: Vec<SRegion>,
+    /// Overall pattern agreement, in `[0, 1]`.
     pub consistency_score: f64,
+    /// `1 - consistency_score`.
     pub manipulation_probability: f64,
+    /// Raw per-block correlation values, in scan order.
     pub block_correlations: Vec<f64>,
+    /// Distribution moments of the residual.
     pub prnu_statistics: PrnuStatistics,
 }
 
+/// Distribution moments of the extracted PRNU residual.
+///
+/// A clean residual is roughly Gaussian: mean, skewness and excess kurtosis
+/// all near zero. Large departures usually mean scene content leaked through
+/// the denoiser rather than anything about the sensor.
 #[derive(Debug, Clone)]
 pub struct PrnuStatistics {
+    /// Mean of the residual. Should sit near zero.
     pub mean: f64,
+    /// Standard deviation of the residual.
     pub std_dev: f64,
+    /// Third standardised moment. Near zero for a clean residual.
     pub skewness: f64,
+    /// Excess kurtosis. Near zero for a clean residual.
     pub kurtosis: f64,
+    /// Mean squared residual.
     pub energy: f64,
 }
 
+/// Photo-response non-uniformity: the sensor's fixed-pattern fingerprint.
+///
+/// No two photosites respond identically to light, and that pattern is stable
+/// across every photo a given sensor takes.
+///
+/// # Limitations
+///
+/// Much weaker than single-image PRNU is usually presented as being. Practical
+/// sensor identification averages residuals over dozens of reference frames
+/// from the known camera; a pattern estimated from one image is dominated by
+/// scene content. JPEG compression attenuates PRNU severely and resizing
+/// destroys it outright.
 pub struct PrnuAnalyzer {
     config: PrnuConfig,
 }
 
 impl PrnuAnalyzer {
+    /// Analyzer with the default configuration.
     pub fn new() -> Self {
         Self::with_config(PrnuConfig::default())
     }
 
+    /// Analyzer with custom settings.
     pub fn with_config(config: PrnuConfig) -> Self {
         Self { config }
     }
 
+    /// Run the analysis.
+    ///
+    /// # Errors
+    ///
+    /// [`ImageTooSmall`](crate::error::ForensicsError::ImageTooSmall) below
+    /// twice `block_size`.
     pub fn analyze(&self, image: &DynamicImage) -> Result<PrnuAnalysisResult> {
         let rgb = image.to_rgb8();
         let (width, height) = rgb.dimensions();
@@ -431,6 +475,11 @@ impl PrnuAnalyzer {
         (mean * (1.0 - low_ratio * 0.5)).clamp(0.0, 1.0)
     }
 
+    /// Zero-mean normalised correlation between two PRNU patterns, in `[-1, 1]`.
+    ///
+    /// Computed over the overlapping area. This is the forensically meaningful
+    /// use of PRNU: comparing a questioned image against a reference pattern
+    /// from a known camera.
     pub fn compare_patterns(&self, pattern1: &GrayImage, pattern2: &GrayImage) -> f64 {
         let (w1, h1) = pattern1.dimensions();
         let (w2, h2) = pattern2.dimensions();
@@ -520,7 +569,10 @@ mod tests {
         let b = pattern(32, 128, 0);
 
         let correlation = PrnuAnalyzer::new().compare_patterns(&a, &b);
-        assert!((correlation - 1.0).abs() < 1e-9, "self-correlation {correlation}");
+        assert!(
+            (correlation - 1.0).abs() < 1e-9,
+            "self-correlation {correlation}"
+        );
     }
 
     #[test]

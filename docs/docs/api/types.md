@@ -4,6 +4,15 @@ title: Types
 description: The shared types every module produces or consumes.
 ---
 
+<div class="note">
+
+Every public item in the crate carries a doc comment, and the crate builds
+under `#![warn(missing_docs)]`. This page is a conceptual overview; for exact
+signatures run `cargo doc --open`, which is generated from the source and
+cannot drift out of sync with it.
+
+</div>
+
 ## `SRegion`
 
 An axis-aligned rectangle in pixel coordinates. Every module that reports a

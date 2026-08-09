@@ -9,6 +9,17 @@ use crate::{
     region::merge_regions,
 };
 
+/// Shading direction, and blocks that disagree with the dominant lighting.
+///
+/// Surfaces lit from one direction shade consistently. An object composited
+/// from a differently-lit source shades the wrong way.
+///
+/// # Limitations
+///
+/// Edges dominate the measurement: texture and object boundaries produce far
+/// stronger gradients than surface shading, so on a detailed scene the
+/// "dominant direction" largely reflects edge orientation statistics. Albedo
+/// changes are indistinguishable from shading here.
 pub struct LuminanceGradientAnalyzer {
     block_size: u32,
     /// Gradients weaker than this are treated as flat and ignored.
@@ -17,17 +28,24 @@ pub struct LuminanceGradientAnalyzer {
     angle_tolerance: f64,
 }
 
+/// Output of [`LuminanceGradientAnalyzer`].
 pub struct LuminanceGradientResult {
+    /// Sobel magnitude at every pixel.
     pub gradient_map: GrayImage,
+    /// Sobel orientation, packed into `0..=255` across `[-PI, PI]`.
     pub direction_map: GrayImage,
+    /// Blocks whose shading disagrees with the dominant direction.
     pub inconsistent_regions: Vec<SRegion>,
     /// Dominant illumination direction in radians, within `[-PI, PI]`.
+    /// Magnitude-weighted circular mean, in `[-PI, PI]`.
     pub dominant_direction: f64,
     /// Circular concentration of the gradient directions, within `[0, 1]`.
+    /// Resultant length of that mean, in `[0, 1]`.
     pub direction_confidence: f64,
 }
 
 impl LuminanceGradientAnalyzer {
+    /// Analyzer with the given tile size and default thresholds.
     pub fn new(block_size: u32) -> Self {
         Self {
             block_size: block_size.max(1),
@@ -36,6 +54,7 @@ impl LuminanceGradientAnalyzer {
         }
     }
 
+    /// Angular deviation from the dominant direction before a block is flagged.
     pub fn with_angle_tolerance(mut self, radians: f64) -> Self {
         self.angle_tolerance = radians;
         self
@@ -50,6 +69,7 @@ impl LuminanceGradientAnalyzer {
         self
     }
 
+    /// Run the analysis. Accepts any image size.
     pub fn analyze(&self, image: &DynamicImage) -> Result<LuminanceGradientResult> {
         let gray = rgb_to_gray(&image.to_rgb8());
         let (width, height) = gray.dimensions();
@@ -112,7 +132,8 @@ impl LuminanceGradientAnalyzer {
                 }
 
                 let (block_direction, confidence) = circular_mean(&samples);
-                confidence > 0.3 && angular_distance(block_direction, dominant) > self.angle_tolerance
+                confidence > 0.3
+                    && angular_distance(block_direction, dominant) > self.angle_tolerance
             })
             .collect();
 

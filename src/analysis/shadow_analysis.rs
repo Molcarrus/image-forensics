@@ -5,16 +5,25 @@ use image::{DynamicImage, GrayImage, Luma, Rgb, RgbImage};
 use crate::{
     SRegion, draw,
     error::Result,
-    image_utils::{angle_to_u8, calculate_histogram, ensure_min_dimensions, rgb_to_gray, sobel, u8_to_angle},
+    image_utils::{
+        angle_to_u8, calculate_histogram, ensure_min_dimensions, rgb_to_gray, sobel, u8_to_angle,
+    },
 };
 
+/// Settings for [`ShadowAnalyzer`].
 #[derive(Debug, Clone)]
 pub struct ShadowConfig {
+    /// Reserved; regions come from connected components, not tiles.
     pub block_size: u32,
+    /// Reserved for future edge filtering.
     pub edge_threshold: f64,
+    /// Intensity ceiling for a shadow pixel, combined with an adaptive percentile.
     pub shadow_threshold: u8,
+    /// Minimum connected-component **area**, in pixels.
     pub min_shadow_size: u32,
+    /// Degrees a region may deviate from the dominant direction before being flagged.
     pub angle_tolerance: f64,
+    /// Boundary gradient magnitude needed to contribute a direction sample.
     pub gradient_threshold: f64,
 }
 
@@ -31,25 +40,41 @@ impl Default for ShadowConfig {
     }
 }
 
+/// One segmented shadow and the light direction it implies.
 #[derive(Debug, Clone)]
 pub struct ShadowRegion {
+    /// Bounding box of the connected component.
     pub region: SRegion,
+    /// Implied direction to the light source, in radians.
     pub light_direction: f64,
+    /// Circular concentration of the boundary samples, in `[0, 1]`.
     pub direction_confidence: f64,
+    /// Mean luminance inside the shadow.
     pub intensity: f64,
+    /// Mean boundary gradient, distinguishing hard shadows from soft.
     pub edge_sharpness: f64,
 }
 
+/// Output of [`ShadowAnalyzer`].
 #[derive(Debug, Clone)]
 pub struct ShadowAnalysisResult {
+    /// Every shadow found, with its own direction estimate.
     pub shadow_regions: Vec<ShadowRegion>,
+    /// Area- and confidence-weighted circular mean, in `[-PI, PI]`.
     pub dominant_light_direction: f64,
+    /// Resultant length of that mean, in `[0, 1]`.
     pub dominant_direction_confidence: f64,
+    /// Shadows deviating beyond `angle_tolerance`.
     pub inconsistent_regions: Vec<SRegion>,
+    /// The original with shadows boxed and their directions arrowed.
     pub direction_map: RgbImage,
+    /// Binary shadow segmentation after morphological cleanup.
     pub shadow_mask: GrayImage,
+    /// Weighted share of shadows agreeing with the dominant direction.
     pub consistency_score: f64,
+    /// Combined inconsistency and light-source count, in `[0, 1]`.
     pub manipulation_probability: f64,
+    /// Directional clusters found, capped at 5.
     pub estimated_light_sources: usize,
 }
 
@@ -60,19 +85,38 @@ struct Gradients {
     direction: GrayImage,
 }
 
+/// Shadow segmentation and per-shadow light direction.
+///
+/// A scene lit by one dominant source casts shadows in one consistent
+/// direction. People judge shadow consistency poorly by eye, which makes it a
+/// good candidate for automation.
+///
+/// # Limitations
+///
+/// Segmentation is the weak link: it thresholds on intensity and saturation,
+/// so dark clothing, dark paint and deep foliage are routinely taken for
+/// shadow. Multiple light sources are normal indoors and are not evidence.
 pub struct ShadowAnalyzer {
     config: ShadowConfig,
 }
 
 impl ShadowAnalyzer {
+    /// Analyzer with the default configuration.
     pub fn new() -> Self {
         Self::with_config(ShadowConfig::default())
     }
 
+    /// Analyzer with custom settings.
     pub fn with_config(config: ShadowConfig) -> Self {
         Self { config }
     }
 
+    /// Run the analysis.
+    ///
+    /// # Errors
+    ///
+    /// [`ImageTooSmall`](crate::error::ForensicsError::ImageTooSmall) below
+    /// twice `block_size`.
     pub fn analyze(&self, image: &DynamicImage) -> Result<ShadowAnalysisResult> {
         let rgb = image.to_rgb8();
         let gray = rgb_to_gray(&rgb);
@@ -335,8 +379,14 @@ impl ShadowAnalyzer {
         for y in 0..height {
             for x in 0..width {
                 if shadow_mask.get_pixel(x, y)[0] > 0 && !visited[y as usize][x as usize] {
-                    let region_info = self
-                        .analyze_single_shadow_region(shadow_mask, gray, gradients, x, y, &mut visited);
+                    let region_info = self.analyze_single_shadow_region(
+                        shadow_mask,
+                        gray,
+                        gradients,
+                        x,
+                        y,
+                        &mut visited,
+                    );
 
                     // `analyze_single_shadow_region` already rejects components
                     // below `min_shadow_size` pixels. The extra filter here
@@ -459,10 +509,14 @@ impl ShadowAnalyzer {
                 let nx = x as i32 + dx;
                 let ny = y as i32 + dy;
 
-                if nx >= 0 && nx < width as i32 && ny >= 0 && ny < height as i32
-                    && mask.get_pixel(nx as u32, ny as u32)[0] == 0 {
-                        return true;
-                    }
+                if nx >= 0
+                    && nx < width as i32
+                    && ny >= 0
+                    && ny < height as i32
+                    && mask.get_pixel(nx as u32, ny as u32)[0] == 0
+                {
+                    return true;
+                }
             }
         }
 

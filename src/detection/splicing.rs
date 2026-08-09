@@ -1,20 +1,29 @@
 use image::{GrayImage, Luma, Rgb, RgbImage};
 
 use crate::{
-    SRegion, draw,
+    SRegion,
     analysis::{ela::ElaAnalyzer, noise::NoiseAnalyzer},
     detection::{ConfidenceLevel, DetectedManipulation, DetectionResult, Detector},
+    draw,
     error::Result,
     image_utils::{clipped_blocks, ensure_min_dimensions, rgb_to_gray, sobel},
 };
 
+/// Settings for [`SplicingDetector`].
 #[derive(Debug, Clone)]
 pub struct SplicingConfig {
+    /// Tile size for the colour and edge sweeps. Default 16.
     pub block_size: u32,
+    /// Scales both the inconsistency map and the colour flagging cutoff.
     pub color_sensitivity: f64,
+    /// Carried but not currently wired into the internal noise analyzer.
     pub noise_sensitivity: f64,
+    /// Higher lowers the edge-regularity cutoff, flagging more.
     pub edge_sensitivity: f64,
+    /// Merged regions smaller than this many pixels are dropped. The default of
+    /// 1000 will hide a small pasted face or licence plate.
     pub min_region_size: u32,
+    /// Quality passed to the internal ELA analyzer.
     pub ela_quality: u8,
 }
 
@@ -31,17 +40,32 @@ impl Default for SplicingConfig {
     }
 }
 
+/// Detects content composited in from a different image.
+///
+/// Runs four checks — colour histogram, edge regularity, noise and ELA — and
+/// reports a region only where **at least two independently flag it**. That
+/// corroboration requirement is the whole design: the individual signals are
+/// weak, and each contributes 0.25 to the confidence, so the score is
+/// effectively a count of agreeing methods.
+///
+/// # Limitations
+///
+/// Requiring two signals suppresses genuine single-signal splices along with
+/// false positives. A resave at uniform quality erases the ELA and much of the
+/// noise evidence, typically dropping a real splice below the bar.
 pub struct SplicingDetector {
     config: SplicingConfig,
 }
 
 impl SplicingDetector {
+    /// Detector with the default configuration.
     pub fn new() -> Self {
         Self {
             config: SplicingConfig::default(),
         }
     }
 
+    /// Detector with custom settings.
     pub fn with_config(config: SplicingConfig) -> Self {
         Self { config }
     }
@@ -159,13 +183,8 @@ impl SplicingDetector {
         let edge_threshold = 0.9 - (0.4 * self.config.edge_sensitivity);
 
         for block in clipped_blocks(width, height, block_size, block_size) {
-            let (horizontal_score, vertical_score) = self.analyze_edge_regularity(
-                edge_map,
-                block.x,
-                block.y,
-                block.width,
-                block.height,
-            );
+            let (horizontal_score, vertical_score) =
+                self.analyze_edge_regularity(edge_map, block.x, block.y, block.width, block.height);
 
             if horizontal_score > edge_threshold || vertical_score > edge_threshold {
                 regions.push(block);
@@ -484,11 +503,21 @@ mod tests {
 
     #[test]
     fn detected_regions_stay_within_the_image() {
-        let result = SplicingDetector::new().detect(&composite(150, 130)).unwrap();
+        let result = SplicingDetector::new()
+            .detect(&composite(150, 130))
+            .unwrap();
 
         for manipulation in &result.manipulations {
-            assert!(manipulation.region.right() <= 150, "{:?}", manipulation.region);
-            assert!(manipulation.region.bottom() <= 130, "{:?}", manipulation.region);
+            assert!(
+                manipulation.region.right() <= 150,
+                "{:?}",
+                manipulation.region
+            );
+            assert!(
+                manipulation.region.bottom() <= 130,
+                "{:?}",
+                manipulation.region
+            );
         }
     }
 
@@ -500,7 +529,9 @@ mod tests {
 
     #[test]
     fn scores_are_bounded() {
-        let result = SplicingDetector::new().detect(&composite(128, 128)).unwrap();
+        let result = SplicingDetector::new()
+            .detect(&composite(128, 128))
+            .unwrap();
 
         assert!((0.0..=1.0).contains(&result.overall_score));
         for manipulation in &result.manipulations {

@@ -8,12 +8,18 @@ use crate::{
     image_utils::{clipped_blocks, ensure_min_dimensions, full_blocks, rgb_to_gray},
 };
 
+/// Settings for [`ResamplingDetector`].
 #[derive(Debug, Clone)]
 pub struct ResamplingConfig {
+    /// Tile for the local periodicity sweep. Default 64.
     pub block_size: u32,
+    /// Maximum autocorrelation lag, bounding the longest detectable period.
     pub window_size: u32,
+    /// Minimum peak strength for a pattern; also the region cutoff.
     pub threshold: f64,
+    /// Smallest scaling factor considered plausible.
     pub min_factor: f64,
+    /// Largest scaling factor considered plausible.
     pub max_factor: f64,
 }
 
@@ -29,36 +35,67 @@ impl Default for ResamplingConfig {
     }
 }
 
+/// Output of [`ResamplingDetector`].
 #[derive(Debug, Clone)]
 pub struct ResamplingResult {
+    /// Local periodicity strength across the image.
     pub probability_map: GrayImage,
+    /// Peaks found along rows and columns.
     pub periodic_patterns: Vec<PeriodicPattern>,
+    /// Scaling factor implied by the strongest peak, when it falls inside the configured range.
     pub estimated_factor: Option<f64>,
+    /// Combined peak strength and coverage, in `[0, 1]`.
     pub resampling_probability: f64,
+    /// Tiles exceeding the probability threshold.
     pub resampled_regions: Vec<SRegion>,
+    /// Second-derivative map the autocorrelation is computed over.
     pub p_map: GrayImage,
 }
 
+/// A periodic peak found in the interpolation residual.
 #[derive(Debug, Clone)]
 pub struct PeriodicPattern {
+    /// Autocorrelation lag of the peak, in samples.
     pub period: f64,
+    /// Normalised peak height, in `[0, 1]`.
     pub strength: f64,
+    /// 0 for horizontal, `PI / 2` for vertical.
     pub direction: f64, // 0 = horizontal, PI/2 = vertical
 }
 
+/// Periodic interpolation residue left by scaling or rotation.
+///
+/// Resampling makes every output pixel a weighted combination of its
+/// neighbours, introducing a periodic linear dependence whose period is set by
+/// the scaling factor.
+///
+/// # Limitations
+///
+/// Whole-image resampling is unremarkable — nearly every image on the web has
+/// been resized. A region resampled while the rest of the frame is not is the
+/// finding worth pursuing. JPEG compression masks the residue, and naturally
+/// periodic content (fabric, brickwork, fences) produces the same peaks.
 pub struct ResamplingDetector {
     config: ResamplingConfig,
 }
 
 impl ResamplingDetector {
+    /// Detector with the default configuration.
     pub fn new() -> Self {
         Self::with_config(ResamplingConfig::default())
     }
 
+    /// Detector with custom settings.
     pub fn with_config(config: ResamplingConfig) -> Self {
         Self { config }
     }
 
+    /// Run the analysis.
+    ///
+    /// # Errors
+    ///
+    /// [`ImageTooSmall`](crate::error::ForensicsError::ImageTooSmall) below
+    /// twice `block_size`.
     pub fn detect(&self, image: &DynamicImage) -> Result<ResamplingResult> {
         let gray = rgb_to_gray(&image.to_rgb8());
         let (width, height) = gray.dimensions();
@@ -124,23 +161,25 @@ impl ResamplingDetector {
 
         let h_autocorr = self.compute_autocorrelation(p_map, true);
         if let Some((period, strength)) = self.find_period(&h_autocorr)
-            && strength > self.config.threshold {
-                patterns.push(PeriodicPattern {
-                    period,
-                    strength,
-                    direction: 0.0,
-                });
-            }
+            && strength > self.config.threshold
+        {
+            patterns.push(PeriodicPattern {
+                period,
+                strength,
+                direction: 0.0,
+            });
+        }
 
         let v_autocorr = self.compute_autocorrelation(p_map, false);
         if let Some((period, strength)) = self.find_period(&v_autocorr)
-            && strength > self.config.threshold {
-                patterns.push(PeriodicPattern {
-                    period,
-                    strength,
-                    direction: PI / 2.0,
-                });
-            }
+            && strength > self.config.threshold
+        {
+            patterns.push(PeriodicPattern {
+                period,
+                strength,
+                direction: PI / 2.0,
+            });
+        }
 
         patterns
     }
@@ -219,11 +258,13 @@ impl ResamplingDetector {
         let mut best_period = 0.0;
 
         for i in 2..autocorr.len() - 1 {
-            if autocorr[i] > autocorr[i - 1] && autocorr[i] > autocorr[i + 1]
-                && autocorr[i] > best_peak {
-                    best_peak = autocorr[i];
-                    best_period = i as f64;
-                }
+            if autocorr[i] > autocorr[i - 1]
+                && autocorr[i] > autocorr[i + 1]
+                && autocorr[i] > best_peak
+            {
+                best_peak = autocorr[i];
+                best_period = i as f64;
+            }
         }
 
         if best_peak > 0.1 {

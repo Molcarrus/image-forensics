@@ -154,13 +154,22 @@ mod tests {
         for (x, y) in [(4, 4), (11, 4), (4, 11), (11, 11)] {
             assert_eq!(*image.get_pixel(x, y), Rgb([0, 0, 255]), "corner {x},{y}");
         }
-        assert_eq!(*image.get_pixel(7, 7), Rgb([0, 0, 0]), "interior stays clear");
+        assert_eq!(
+            *image.get_pixel(7, 7),
+            Rgb([0, 0, 0]),
+            "interior stays clear"
+        );
     }
 
     #[test]
     fn fill_clips_to_the_canvas() {
         let mut image = canvas();
-        fill(&mut image, &SRegion::new(28, 28, 64, 64), Rgb([255, 255, 255]), 1.0);
+        fill(
+            &mut image,
+            &SRegion::new(28, 28, 64, 64),
+            Rgb([255, 255, 255]),
+            1.0,
+        );
 
         assert_eq!(*image.get_pixel(31, 31), Rgb([255, 255, 255]));
     }

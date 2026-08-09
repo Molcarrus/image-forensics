@@ -9,10 +9,14 @@ use crate::{
     region::merge_regions,
 };
 
+/// Settings for [`BenfordAnalyzer`].
 #[derive(Debug, Clone)]
 pub struct BenfordConfig {
+    /// Tile over which each local chi-square is computed. Default 64.
     pub block_size: u32,
+    /// Tiles scoring above this are flagged. Default 15.
     pub chi_square_threshold: f64,
+    /// Tiles with fewer usable coefficients score 0 rather than a noisy statistic.
     pub min_samples: usize,
 }
 
@@ -26,27 +30,47 @@ impl Default for BenfordConfig {
     }
 }
 
+/// Output of [`BenfordAnalyzer`].
 #[derive(Debug, Clone)]
 pub struct BenfordAnalysisResult {
+    /// Observed first-digit frequencies across the whole image.
     pub global_distribution: [f64; 9],
+    /// Benford's Law frequencies, `log10(1 + 1/d)` for `d` in 1..=9.
     pub expected_distribution: [f64; 9],
+    /// Goodness of fit between the two distributions. Lower is closer.
     pub global_chi_square: f64,
+    /// Per-tile chi-square, normalised for display.
     pub deviation_map: GrayImage,
+    /// Tiles exceeding `chi_square_threshold`, merged.
     pub anomalous_regions: Vec<SRegion>,
+    /// How closely the image follows Benford, in `[0, 1]`.
     pub conformity_score: f64,
+    /// Combined global and local score, in `[0, 1]`.
     pub manipulation_probability: f64,
 }
 
+/// Tests the leading digits of DCT coefficients against Benford's Law.
+///
+/// The AC coefficients of a JPEG follow `P(d) = log10(1 + 1/d)` closely.
+/// Editing, requantisation and synthetic content perturb that distribution.
+///
+/// # Limitations
+///
+/// Benford applies to lossy-compressed natural images. It is weak on lossless
+/// input, on graphic content, and on images with large flat areas. A departure
+/// indicates requantisation, which is not the same as editing.
 pub struct BenfordAnalyzer {
     config: BenfordConfig,
     expected: [f64; 9],
 }
 
 impl BenfordAnalyzer {
+    /// Analyzer with the default configuration.
     pub fn new() -> Self {
         Self::with_config(BenfordConfig::default())
     }
 
+    /// Analyzer with custom settings.
     pub fn with_config(config: BenfordConfig) -> Self {
         // Benford's Law: P(d) = log10(1 + 1/d)
         let expected = std::array::from_fn(|i| (1.0 + 1.0 / (i + 1) as f64).log10());
@@ -54,6 +78,12 @@ impl BenfordAnalyzer {
         Self { config, expected }
     }
 
+    /// Run the analysis.
+    ///
+    /// # Errors
+    ///
+    /// [`ImageTooSmall`](crate::error::ForensicsError::ImageTooSmall) below
+    /// `block_size` in either dimension.
     pub fn analyze(&self, image: &DynamicImage) -> Result<BenfordAnalysisResult> {
         let gray = rgb_to_gray(&image.to_rgb8());
         let (width, height) = gray.dimensions();

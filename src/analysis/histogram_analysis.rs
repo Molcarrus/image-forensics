@@ -5,11 +5,16 @@ use crate::{
     image_utils::{full_blocks, rgb_to_gray},
 };
 
+/// Settings for [`HistogramAnalyzer`].
 #[derive(Debug, Clone)]
 pub struct HistogramConfig {
+    /// Tile for the local gap map. Default 64.
     pub block_size: u32,
+    /// A level with at most this many pixels counts as a gap.
     pub gap_threshold: u32,
+    /// Reserved for future peak filtering.
     pub peak_threshold: f64,
+    /// Share of pixels at 0 or 255 before clipping is reported.
     pub clipping_threshold: f64,
 }
 
@@ -24,27 +29,75 @@ impl Default for HistogramConfig {
     }
 }
 
+/// A departure from the tonal distribution of an unedited photograph.
 #[derive(Debug, Clone)]
 pub enum HistogramAnomaly {
-    Gap { count: usize, positions: Vec<u8> },
-    CombPattern { period: f64, strength: f64 },
-    ShadowClipping { percentage: f64 },
-    HighlightClipping { percentage: f64 },
-    UnusualPeak { position: u8, height: f64 },
-    TruncatedRange { min: u8, max: u8 },
+    /// Empty levels between the darkest and brightest occupied bins, as a
+    /// contrast stretch or levels adjustment leaves behind.
+    Gap {
+        /// How many levels are empty.
+        count: usize,
+        /// Which levels.
+        positions: Vec<u8>,
+    },
+    /// Regular alternation between full and empty bins, from a strong curve or
+    /// repeated tonal edits.
+    CombPattern {
+        /// Spacing between teeth, in levels.
+        period: f64,
+        /// Share of bins participating, in `[0, 1]`.
+        strength: f64,
+    },
+    /// Mass piled at level 0: the black point was raised, or the shot was
+    /// underexposed.
+    ShadowClipping {
+        /// Share of all pixels sitting at zero.
+        percentage: f64,
+    },
+    /// Mass piled at level 255: the white point was lowered, or highlights blew.
+    HighlightClipping {
+        /// Share of all pixels sitting at 255.
+        percentage: f64,
+    },
+    /// A spike far above its neighbours, from compressed levels or a large flat
+    /// synthetic region.
+    UnusualPeak {
+        /// Level the spike sits at.
+        position: u8,
+        /// Share of all pixels in that one bin.
+        height: f64,
+    },
+    /// The image never reaches full black or full white.
+    TruncatedRange {
+        /// Darkest occupied level.
+        min: u8,
+        /// Brightest occupied level.
+        max: u8,
+    },
 }
 
+/// Output of [`HistogramAnalyzer`].
 #[derive(Debug, Clone)]
 pub struct HistogramAnalysisResult {
+    /// 256-bin luminance distribution.
     pub luminance_histogram: [u32; 256],
+    /// 256-bin red channel distribution.
     pub red_histogram: [u32; 256],
+    /// 256-bin green channel distribution.
     pub green_histogram: [u32; 256],
+    /// 256-bin blue channel distribution.
     pub blue_histogram: [u32; 256],
+    /// Everything unusual found in the distribution.
     pub anomalies: Vec<HistogramAnomaly>,
+    /// Where the *local* histogram is combed, localising a partial adjustment.
     pub gaps_map: GrayImage,
+    /// Weighted sum over the anomalies, in `[0, 1]`.
     pub manipulation_probability: f64,
+    /// Gamma implied by the median tone, when it departs from linear by more than 15%.
     pub estimated_gamma: Option<f64>,
+    /// Whether the gaps are evenly spaced, as a contrast stretch leaves them.
     pub contrast_stretched: bool,
+    /// Whether any gaps were found at all.
     pub levels_adjusted: bool,
 }
 
@@ -57,19 +110,33 @@ struct PlotArea {
     plot_height: u32,
 }
 
+/// Combs, gaps and clipping left by levels, curves and gamma adjustments.
+///
+/// Stretching contrast spreads existing levels apart and leaves empty bins;
+/// compressing them stacks counts into spikes. None of that is visible in the
+/// image, but all of it is plain in the histogram.
+///
+/// # Limitations
+///
+/// Tonal editing is not forgery. Every raw conversion and every filter combs
+/// the histogram; this module detects *adjustment*, which says nothing about
+/// whether content was altered.
 pub struct HistogramAnalyzer {
     config: HistogramConfig,
 }
 
 impl HistogramAnalyzer {
+    /// Analyzer with the default configuration.
     pub fn new() -> Self {
         Self::with_config(HistogramConfig::default())
     }
 
+    /// Analyzer with custom settings.
     pub fn with_config(config: HistogramConfig) -> Self {
         Self { config }
     }
 
+    /// Run the analysis. Accepts any image size.
     pub fn analyze(&self, image: &DynamicImage) -> Result<HistogramAnalysisResult> {
         let rgb = image.to_rgb8();
         let gray = rgb_to_gray(&rgb);
@@ -207,8 +274,7 @@ impl HistogramAnalyzer {
             .windows(3)
             .enumerate()
             .filter_map(|(i, window)| {
-                let (prev, curr, next) =
-                    (window[0] as f64, window[1] as f64, window[2] as f64);
+                let (prev, curr, next) = (window[0] as f64, window[1] as f64, window[2] as f64);
 
                 (curr > prev * 3.0 && curr > next * 3.0 && curr > mean * 5.0).then(|| {
                     HistogramAnomaly::UnusualPeak {
@@ -407,6 +473,7 @@ impl HistogramAnalyzer {
         }
     }
 
+    /// Render the three channel histograms stacked vertically.
     pub fn render_rgb_histograms(&self, result: &HistogramAnalysisResult) -> RgbImage {
         let plot_width = 512u32;
         let plot_height = 200u32;
@@ -444,6 +511,7 @@ impl HistogramAnalyzer {
         canvas
     }
 
+    /// Render the three channel histograms superimposed, additively blended.
     pub fn render_rgb_histograms_overlaid(&self, result: &HistogramAnalysisResult) -> RgbImage {
         let plot_width = 512u32;
         let plot_height = 300u32;
@@ -520,7 +588,11 @@ mod tests {
     use super::*;
 
     fn solid(width: u32, height: u32, value: u8) -> DynamicImage {
-        DynamicImage::ImageRgb8(RgbImage::from_pixel(width, height, Rgb([value, value, value])))
+        DynamicImage::ImageRgb8(RgbImage::from_pixel(
+            width,
+            height,
+            Rgb([value, value, value]),
+        ))
     }
 
     fn ramp(width: u32, height: u32) -> DynamicImage {
@@ -561,7 +633,9 @@ mod tests {
 
     #[test]
     fn dark_image_reports_a_gamma() {
-        let result = HistogramAnalyzer::new().analyze(&solid(64, 64, 20)).unwrap();
+        let result = HistogramAnalyzer::new()
+            .analyze(&solid(64, 64, 20))
+            .unwrap();
         assert!(result.estimated_gamma.is_some());
     }
 

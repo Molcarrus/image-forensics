@@ -1,3 +1,10 @@
+//! Heatmap and overlay rendering for analysis results.
+//!
+//! Most modules return grayscale maps that look almost black when saved
+//! directly. [`Visualizer::create_heatmap`] colourises one, and
+//! [`Visualizer::overlay_heatmap`] blends it over the original so you can see
+//! *where* on the photograph a module reacted.
+
 use image::{GrayImage, Luma, Rgb, RgbImage};
 
 use crate::{
@@ -6,22 +13,38 @@ use crate::{
     error::Result,
 };
 
+/// How a grayscale map is colourised.
 #[derive(Debug, Clone, Copy)]
 pub enum ColorScheme {
+    /// Blue through cyan and green to red. The default.
     HeatMap,
+    /// Blue through white to red, for signed quantities.
     Diverging,
+    /// A perceptually smoother blue-to-yellow ramp.
     Viridis,
+    /// No colourisation.
     Grayscale,
+    /// One hue, scaled by intensity.
     SingleColor(Rgb<u8>),
 }
 
+/// Settings for [`Visualizer`].
 #[derive(Debug, Clone)]
 pub struct VisualizationConfig {
+    /// Palette used by [`Visualizer::create_heatmap`].
     pub color_scheme: ColorScheme,
+    /// Blend factor when overlaying a heatmap, in `[0, 1]`.
     pub overlay_opacity: f32,
+    /// Region outline thickness, in pixels.
     pub border_thickness: u32,
+    /// Whether to burn text labels into composed images.
+    ///
+    /// The label renderer draws placeholder marks rather than real glyphs, so
+    /// labels come out illegible. Prefer captioning outside the image.
     pub show_labels: bool,
+    /// Reserved for future label sizing.
     pub label_scale: f32,
+    /// Whether to draw a colour legend.
     pub show_legend: bool,
 }
 
@@ -38,21 +61,30 @@ impl Default for VisualizationConfig {
     }
 }
 
+/// Renders analysis maps into something legible.
+///
+/// Most modules return grayscale maps that look almost black when saved
+/// directly. [`create_heatmap`](Self::create_heatmap) colourises one, and
+/// [`overlay_heatmap`](Self::overlay_heatmap) blends it over the original so
+/// you can see *where* on the photograph a module reacted.
 pub struct Visualizer {
     config: VisualizationConfig,
 }
 
 impl Visualizer {
+    /// Visualizer with the default configuration.
     pub fn new() -> Self {
         Self {
             config: VisualizationConfig::default(),
         }
     }
 
+    /// Visualizer with custom settings.
     pub fn with_config(config: VisualizationConfig) -> Self {
         Self { config }
     }
 
+    /// Colourise a grayscale map using the configured scheme.
     pub fn create_heatmap(&self, gray: &GrayImage) -> RgbImage {
         let (width, height) = gray.dimensions();
         let mut heatmap = RgbImage::new(width, height);
@@ -119,6 +151,10 @@ impl Visualizer {
         (r.clamp(0.0, 1.0), g.clamp(0.0, 1.0), b.clamp(0.0, 1.0))
     }
 
+    /// Blend a heatmap over the original at the configured opacity.
+    ///
+    /// This is usually what you want for a figure: it shows which part of the
+    /// photograph a module reacted to.
     pub fn overlay_heatmap(&self, original: &RgbImage, heatmap: &RgbImage) -> RgbImage {
         let (width, height) = original.dimensions();
         let mut result = RgbImage::new(width, height);
@@ -141,6 +177,7 @@ impl Visualizer {
         result
     }
 
+    /// Overlay the ELA difference map and outline its suspicious regions.
     pub fn visualize_ela(&self, original: &RgbImage, ela_result: &ElaResult) -> RgbImage {
         let heatmap = self.create_heatmap(&ela_result.difference_map);
         let mut vis = self.overlay_heatmap(original, &heatmap);
@@ -164,6 +201,7 @@ impl Visualizer {
         vis
     }
 
+    /// Draw each matched pair in its own hue, joined by a line.
     pub fn visualize_copy_move(&self, original: &RgbImage, result: &CopyMoveResult) -> RgbImage {
         let mut vis = original.clone();
 
@@ -190,6 +228,7 @@ impl Visualizer {
         vis
     }
 
+    /// Overlay the local variance map and outline anomalous regions.
     pub fn visualize_noise(&self, original: &RgbImage, result: &NoiseResult) -> RgbImage {
         let heatmap = self.create_heatmap(&result.local_variance_map);
         let mut vis = self.overlay_heatmap(original, &heatmap);
@@ -201,6 +240,7 @@ impl Visualizer {
         vis
     }
 
+    /// Draw every detection, coloured by manipulation type.
     pub fn visualize_detections(&self, original: &RgbImage, result: &DetectionResult) -> RgbImage {
         let mut vis = original.clone();
 
@@ -229,7 +269,10 @@ impl Visualizer {
         vis
     }
 
-    pub fn visulaize_full_analysis(
+    /// Render every core analysis at once.
+    ///
+    /// Was spelled `visulaize_full_analysis`.
+    pub fn visualize_full_analysis(
         &self,
         original: &RgbImage,
         report: &FullAnalysisReport,
@@ -540,6 +583,11 @@ impl Visualizer {
         ])
     }
 
+    /// Lay images out side by side with a label strip above each.
+    ///
+    /// The labels are drawn as placeholder marks rather than real glyphs, so
+    /// they are not readable. For documentation figures, compose the images
+    /// separately and caption them in the surrounding page instead.
     pub fn create_comparison(&self, images: &[(&str, &RgbImage)]) -> RgbImage {
         if images.is_empty() {
             return RgbImage::new(1, 1);
@@ -586,6 +634,11 @@ impl Visualizer {
         result
     }
 
+    /// A 2x2 grid of the original alongside the ELA, copy-move and combined
+    /// overviews.
+    ///
+    /// Carries the same illegible-label caveat as
+    /// [`create_comparison`](Self::create_comparison).
     pub fn create_analysis_grid(
         &self,
         original: &RgbImage,
@@ -641,16 +694,24 @@ impl Default for Visualizer {
     }
 }
 
+/// Every core analysis rendered, ready to save.
 pub struct ComprehensiveVisualization {
+    /// The unmodified input.
     pub original: RgbImage,
+    /// Error Level Analysis overlay.
     pub ela: RgbImage,
+    /// Copy-move matches drawn over the original.
     pub copy_move: RgbImage,
+    /// Noise inconsistency overlay.
     pub noise: RgbImage,
+    /// All three signals combined into one view.
     pub combined: RgbImage,
+    /// The score these were produced from, in `[0, 1]`.
     pub tampering_probability: f64,
 }
 
 impl ComprehensiveVisualization {
+    /// Write every view into `directory` as PNG, creating it if needed.
     pub fn save_all(&self, directory: &str) -> Result<()> {
         std::fs::create_dir_all(directory)?;
 
@@ -664,6 +725,10 @@ impl ComprehensiveVisualization {
         Ok(())
     }
 
+    /// Compose the views into a single side-by-side strip.
+    ///
+    /// Inherits the illegible-label caveat from
+    /// [`Visualizer::create_comparison`].
     pub fn create_report_image(&self) -> RgbImage {
         let visualizer = Visualizer::new();
         visualizer.create_comparison(&[

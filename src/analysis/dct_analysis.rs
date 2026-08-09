@@ -6,11 +6,16 @@ use crate::{
     image_utils::{ensure_min_dimensions, mean_and_variance, rgb_to_gray},
 };
 
+/// Settings for [`DctAnalyzer`].
 #[derive(Debug, Clone)]
 pub struct DctConfig {
+    /// DCT block size. JPEG uses 8 and nothing else is meaningful here.
     pub block_size: usize,
+    /// Resolution of the AC coefficient histogram.
     pub histogram_bins: usize,
+    /// Reserved for future block-level thresholding.
     pub anomaly_threshold: f64,
+    /// How many AC coefficients participate in the statistics.
     pub ac_coefficients_count: usize,
 }
 
@@ -25,21 +30,42 @@ impl Default for DctConfig {
     }
 }
 
+/// Output of [`DctAnalyzer`].
 pub struct DctAnalysisResult {
+    /// Quality implied by the estimated quantisation table.
     pub primary_quality: u8,
+    /// Quality of an earlier compression, when one is indicated.
     pub secondary_quality: Option<u8>,
+    /// Combined periodicity, distribution and grid score, in `[0, 1]`.
     pub double_compression_probability: f64,
+    /// Histogram of the first AC coefficient across all blocks.
     pub ac_histogram: Vec<u32>,
+    /// Strongest normalised autocorrelation peak, in `[0, 1]`.
     pub histogram_periodicity: f64,
+    /// Discontinuity strength on the 8-pixel coding grid.
     pub block_artifact_map: GrayImage,
+    /// High-frequency energy per block.
     pub dct_energy_map: GrayImage,
+    /// Blocks more than 2.5 standard deviations from the mean energy.
     pub anomalous_regions: Vec<SRegion>,
+    /// Quantisation step recovered per coefficient position.
     pub estimated_quantization_table: [[f64; 8]; 8],
 }
 
 // Index-based loops are the clearest expression of a dense 8x8 matrix
 // product and of the DCT basis construction; iterator rewrites here obscure
 // the (row, column) roles without changing the generated code.
+/// Frequency-domain analysis of JPEG quantisation structure.
+///
+/// Computes the DCT of every aligned 8x8 block, estimates the quantisation
+/// table from coefficient spacing, and looks for the periodicity that
+/// requantising an already-quantised coefficient set leaves behind.
+///
+/// # Limitations
+///
+/// The quantisation table is estimated from decoded pixels, not read from the
+/// JPEG header, so it is an approximation. Only grid-aligned blocks are
+/// analysed: a crop by an amount not divisible by 8 degrades every estimate.
 #[allow(clippy::needless_range_loop)]
 pub struct DctAnalyzer {
     config: DctConfig,
@@ -49,10 +75,12 @@ pub struct DctAnalyzer {
 
 #[allow(clippy::needless_range_loop)]
 impl DctAnalyzer {
+    /// Analyzer with the default configuration.
     pub fn new() -> Self {
         Self::with_config(DctConfig::default())
     }
 
+    /// Analyzer with custom settings.
     pub fn with_config(config: DctConfig) -> Self {
         let dct_matrix = Self::compute_dct_matrix(8);
         let dct_matrix_t = Self::transpose_matrix(&dct_matrix);
@@ -64,6 +92,7 @@ impl DctAnalyzer {
         }
     }
 
+    /// Orthonormal DCT-II basis of size `n`, padded to 8x8.
     pub fn compute_dct_matrix(n: usize) -> [[f64; 8]; 8] {
         let mut matrix = [[0.0f64; 8]; 8];
 
@@ -94,6 +123,11 @@ impl DctAnalyzer {
         result
     }
 
+    /// Run the analysis.
+    ///
+    /// # Errors
+    ///
+    /// [`ImageTooSmall`](crate::error::ForensicsError::ImageTooSmall) below 16px.
     pub fn analyze(&self, image: &DynamicImage) -> Result<DctAnalysisResult> {
         let gray = rgb_to_gray(&image.to_rgb8());
         let (width, height) = gray.dimensions();
@@ -463,8 +497,6 @@ impl DctAnalyzer {
                 }
             }
         }
-
-        
 
         match best_period {
             0..=4 => 85,

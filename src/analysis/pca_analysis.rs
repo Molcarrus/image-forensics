@@ -9,13 +9,20 @@ use crate::{
     region::merge_regions,
 };
 
+/// Settings for [`PcaAnalyzer`].
 #[derive(Debug, Clone)]
 pub struct PcaConfig {
+    /// Tile size for aggregating patch anomalies into regions.
     pub block_size: u32,
+    /// Eigenvectors retained. More captures more variance and leaves less residual.
     pub num_components: usize,
+    /// Side of each patch, so `patch_size^2` features.
     pub patch_size: u32,
+    /// Step between patches. Half `patch_size` gives 50% overlap.
     pub patch_stride: u32,
+    /// Standard deviations of reconstruction error above the mean before a patch counts as anomalous.
     pub anomaly_threshold: f64,
+    /// Reserved for future component pruning.
     pub min_variance_ratio: f64,
 }
 
@@ -32,32 +39,61 @@ impl Default for PcaConfig {
     }
 }
 
+/// Output of [`PcaAnalyzer`].
 #[derive(Debug, Clone)]
 pub struct PcaAnalysisResult {
+    /// Z-scored reconstruction error. Mid-grey is average.
     pub anomaly_map: GrayImage,
+    /// First principal component projection.
     pub pc1_map: GrayImage,
+    /// Second principal component projection.
     pub pc2_map: GrayImage,
+    /// Third principal component projection.
     pub pc3_map: GrayImage,
+    /// Tiles where anomalous patches concentrate, merged.
     pub anomalous_regions: Vec<SRegion>,
+    /// Share of total variance each component explains. Sums to less than 1.
     pub variance_ratios: Vec<f64>,
+    /// Combined anomaly rate and error spread, in `[0, 1]`.
     pub overall_anomaly_score: f64,
+    /// Coverage-weighted anomaly score, in `[0, 1]`.
     pub manipulation_probability: f64,
 }
 
+/// Flags patches that reconstruct poorly from the image's own subspace.
+///
+/// Overlapping patches from one photograph mostly live in a low-dimensional
+/// subspace. Content from a different source reconstructs from it badly.
+///
+/// # Limitations
+///
+/// It flags *unusual*, not *foreign* — the single most distinctive genuine
+/// object in a photograph is exactly what this reports. A large tampered
+/// region also contaminates the basis it is measured against.
 pub struct PcaAnalyzer {
     config: PcaConfig,
 }
 
 #[allow(clippy::needless_range_loop)]
 impl PcaAnalyzer {
+    /// Analyzer with the default configuration.
     pub fn new() -> Self {
         Self::with_config(PcaConfig::default())
     }
 
+    /// Analyzer with custom settings.
     pub fn with_config(config: PcaConfig) -> Self {
         Self { config }
     }
 
+    /// Run the analysis.
+    ///
+    /// # Errors
+    ///
+    /// [`ImageTooSmall`](crate::error::ForensicsError::ImageTooSmall) below
+    /// twice `block_size`, or
+    /// [`AnalysisFailed`](crate::error::ForensicsError::AnalysisFailed) when
+    /// too few patches could be extracted.
     pub fn analyze(&self, image: &DynamicImage) -> Result<PcaAnalysisResult> {
         let rgb = image.to_rgb8();
         let gray = rgb_to_gray(&rgb);
@@ -614,7 +650,10 @@ mod tests {
         // Normalising by the extracted eigenvalues alone forced this to 1.0.
         assert!(total <= 1.0 + 1e-9, "ratios sum to {total}");
         assert!(
-            result.variance_ratios.iter().all(|r| (0.0..=1.0).contains(r)),
+            result
+                .variance_ratios
+                .iter()
+                .all(|r| (0.0..=1.0).contains(r)),
             "ratios out of range: {:?}",
             result.variance_ratios
         );

@@ -7,12 +7,18 @@ use crate::{
     image_utils::{clipped_blocks, ensure_min_dimensions, full_blocks, sobel},
 };
 
+/// Settings for [`ChromaticAberrationAnalyzer`].
 #[derive(Debug, Clone)]
 pub struct ChromaticAberrationConfig {
+    /// Tile size, swept at 50% overlap. Default 64.
     pub block_size: u32,
+    /// Sobel magnitude a pixel must exceed to serve as an edge point.
     pub edge_threshold: f64,
+    /// Reserved for future edge filtering.
     pub min_edge_strength: f64,
+    /// Search radius in pixels. Measurements beyond it are discarded.
     pub max_aberration: f64,
+    /// Scaled by 50 to give the 0-255 cutoff on the inconsistency map.
     pub inconsistency_threshold: f64,
 }
 
@@ -28,52 +34,100 @@ impl Default for ChromaticAberrationConfig {
     }
 }
 
+/// One tile's measured per-channel misalignment.
 #[derive(Debug, Clone, Copy)]
 pub struct AberrationMeasurement {
+    /// Tile centre, x.
     pub x: u32,
+    /// Tile centre, y.
     pub y: u32,
+    /// Red-to-green horizontal displacement, in pixels.
     pub rg_shift_x: f64,
+    /// Red-to-green vertical displacement, in pixels.
     pub rg_shift_y: f64,
+    /// Blue-to-green horizontal displacement, in pixels.
     pub bg_shift_x: f64,
+    /// Blue-to-green vertical displacement, in pixels.
     pub bg_shift_y: f64,
+    /// Mean normalised cross-correlation at the chosen shift.
     pub confidence: f64,
 }
 
+/// Output of [`ChromaticAberrationAnalyzer`].
 #[derive(Debug, Clone)]
 pub struct ChromaticAberrationResult {
+    /// Per-tile displacement measurements.
     pub measurements: Vec<AberrationMeasurement>,
+    /// Displacement magnitude, normalised for display.
     pub aberration_map: GrayImage,
+    /// Where measured displacement departs from the fitted model.
     pub inconsistency_map: GrayImage,
+    /// The original with shift vectors and the fitted optical centre drawn.
     pub visualization: RgbImage,
+    /// Tiles exceeding `inconsistency_threshold`.
     pub inconsistent_regions: Vec<SRegion>,
+    /// Best-fitting optical centre, if a model was found.
     pub optical_center: Option<(f64, f64)>,
+    /// The fitted radial dispersion model, if one was found.
     pub radial_model: Option<RadialAberrationModel>,
+    /// How well the measurements match the model, in `[0, 1]`.
     pub consistency_score: f64,
+    /// Combined coverage and consistency score, in `[0, 1]`.
     pub manipulation_probability: f64,
 }
 
+/// A radial lens-dispersion model fitted across the frame.
+///
+/// A *displaced* optical centre is the forensic signal: splicing breaks the
+/// radial symmetry that a single lens imposes.
 #[derive(Debug, Clone, Copy)]
 pub struct RadialAberrationModel {
+    /// Fitted optical centre, x.
     pub center_x: f64,
+    /// Fitted optical centre, y.
     pub center_y: f64,
+    /// Red-channel dispersion coefficient, per unit radius.
     pub k_red: f64,
+    /// Blue-channel dispersion coefficient, per unit radius.
     pub k_blue: f64,
+    /// Coefficient of determination for the fit, in `[0, 1]`.
     pub fit_quality: f64,
 }
 
+/// Per-channel lens dispersion, fitted to a radial model.
+///
+/// A lens refracts wavelengths by slightly different amounts, displacing red
+/// and blue relative to green by an amount that grows with distance from the
+/// optical centre. Composited content rarely carries the right displacement
+/// for its position.
+///
+/// # Limitations
+///
+/// Needs strong, high-contrast edges. Modern cameras correct aberration
+/// in-camera and RAW converters apply lens profiles, so a corrected image
+/// reads as "no signal" rather than "authentic". This is the most expensive
+/// module in the crate.
 pub struct ChromaticAberrationAnalyzer {
     config: ChromaticAberrationConfig,
 }
 
 impl ChromaticAberrationAnalyzer {
+    /// Analyzer with the default configuration.
     pub fn new() -> Self {
         Self::with_config(ChromaticAberrationConfig::default())
     }
 
+    /// Analyzer with custom settings.
     pub fn with_config(config: ChromaticAberrationConfig) -> Self {
         Self { config }
     }
 
+    /// Run the analysis.
+    ///
+    /// # Errors
+    ///
+    /// [`ImageTooSmall`](crate::error::ForensicsError::ImageTooSmall) below
+    /// twice `block_size`.
     pub fn analyze(&self, image: &DynamicImage) -> Result<ChromaticAberrationResult> {
         let rgb = image.to_rgb8();
         let (width, height) = rgb.dimensions();
@@ -781,8 +835,16 @@ mod tests {
         let mut image = RgbImage::new(width, height);
 
         for (x, y, pixel) in image.enumerate_pixels_mut() {
-            let base = if (x / 16 + y / 16) % 2 == 0 { 210u8 } else { 45 };
-            let shifted = if ((x + 1) / 16 + y / 16) % 2 == 0 { 210u8 } else { 45 };
+            let base = if (x / 16 + y / 16) % 2 == 0 {
+                210u8
+            } else {
+                45
+            };
+            let shifted = if ((x + 1) / 16 + y / 16) % 2 == 0 {
+                210u8
+            } else {
+                45
+            };
             *pixel = Rgb([shifted, base, base]);
         }
 
@@ -818,11 +880,14 @@ mod tests {
             *pixel = Luma([if x < 16 { 20 } else { 200 }]);
         }
 
-        let edge_points: Vec<(u32, u32, f64, f64)> =
-            (12..20).flat_map(|x| (8..24).map(move |y| (x, y, 0.0, 0.0))).collect();
+        let edge_points: Vec<(u32, u32, f64, f64)> = (12..20)
+            .flat_map(|x| (8..24).map(move |y| (x, y, 0.0, 0.0)))
+            .collect();
 
-        let aligned = analyzer.calculate_edge_correlation(&channel, &channel, &edge_points, 0.0, 0.0);
-        let offset = analyzer.calculate_edge_correlation(&channel, &channel, &edge_points, 3.0, 0.0);
+        let aligned =
+            analyzer.calculate_edge_correlation(&channel, &channel, &edge_points, 0.0, 0.0);
+        let offset =
+            analyzer.calculate_edge_correlation(&channel, &channel, &edge_points, 3.0, 0.0);
 
         assert!(aligned <= 1.0 + 1e-9, "correlation {aligned} exceeds 1");
         assert!(

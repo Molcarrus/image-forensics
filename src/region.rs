@@ -1,3 +1,6 @@
+//! [`SRegion`], the rectangle every module reports locations as, and the
+//! clustering used to merge overlapping detections.
+
 use serde::{Deserialize, Serialize};
 
 /// An axis-aligned rectangle in image pixel coordinates.
@@ -7,13 +10,18 @@ use serde::{Deserialize, Serialize};
 /// was built from a clamped block never overflows when its edges are queried.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct SRegion {
+    /// Leftmost column, in pixels.
     pub x: u32,
+    /// Topmost row, in pixels.
     pub y: u32,
+    /// Width in pixels. May be zero for a region clipped entirely away.
     pub width: u32,
+    /// Height in pixels. May be zero for a region clipped entirely away.
     pub height: u32,
 }
 
 impl SRegion {
+    /// Construct a region from its origin and size.
     pub fn new(x: u32, y: u32, width: u32, height: u32) -> Self {
         Self {
             x,
@@ -52,10 +60,12 @@ impl SRegion {
         self.width as u64 * self.height as u64
     }
 
+    /// True when the region covers no pixels.
     pub fn is_empty(&self) -> bool {
         self.width == 0 || self.height == 0
     }
 
+    /// Centre point, rounded towards the origin.
     pub fn center(&self) -> (u32, u32) {
         (self.x + self.width / 2, self.y + self.height / 2)
     }
@@ -107,7 +117,8 @@ impl SRegion {
     /// Iterate the pixel coordinates covered by the region, row-major.
     pub fn pixels(self) -> impl Iterator<Item = (u32, u32)> {
         let (x, y, w, h) = (self.x, self.y, self.width, self.height);
-        (y..y.saturating_add(h)).flat_map(move |py| (x..x.saturating_add(w)).map(move |px| (px, py)))
+        (y..y.saturating_add(h))
+            .flat_map(move |py| (x..x.saturating_add(w)).map(move |px| (px, py)))
     }
 }
 

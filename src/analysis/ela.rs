@@ -9,6 +9,25 @@ use crate::{
     region::merge_regions,
 };
 
+/// Error Level Analysis.
+///
+/// Recompresses the image at a chosen quality and measures where the result
+/// moves. A region pasted in from a source saved at a different quality has not
+/// settled onto the same quantisation grid, so it moves more than its
+/// surroundings.
+///
+/// # Reading the output
+///
+/// Look at [`ElaResult::image`], not the scalars. In a healthy
+/// single-compression JPEG the ELA image is close to uniform with brightness
+/// concentrated on edges — edges always carry the most quantisation error.
+///
+/// # Limitations
+///
+/// ELA shows *compression history*, not editing. Lossless input has no history
+/// to show; texture always reads brighter than smooth areas; and one resave of
+/// the whole composite at uniform quality erases the difference entirely, so a
+/// negative result says very little.
 pub struct ElaAnalyzer {
     quality: u8,
     amplification: f64,
@@ -17,6 +36,8 @@ pub struct ElaAnalyzer {
 }
 
 impl ElaAnalyzer {
+    /// Analyzer recompressing at `quality`. 90-98 is the useful band: the
+    /// point is to recompress gently so lower-quality regions stand out.
     pub fn new(quality: u8) -> Self {
         Self {
             quality,
@@ -26,16 +47,20 @@ impl ElaAnalyzer {
         }
     }
 
+    /// Display gain applied to the difference maps. Visual only; the reported
+    /// statistics stay in raw difference units.
     pub fn with_amplification(mut self, amp: f64) -> Self {
         self.amplification = amp;
         self
     }
 
+    /// Tile size for suspicious-region detection.
     pub fn with_block_size(mut self, block_size: u32) -> Self {
         self.block_size = block_size.max(1);
         self
     }
 
+    /// Run the analysis. Accepts any image size.
     pub fn analyze(&self, image: &DynamicImage) -> Result<ElaResult> {
         let rgb_image = image.to_rgb8();
         let (width, height) = rgb_image.dimensions();
@@ -83,7 +108,8 @@ impl ElaAnalyzer {
         let std_deviation = variance.sqrt();
 
         let threshold = mean_difference + 2.0 * std_deviation;
-        let suspicious_regions = self.find_suspicious_regions(&differences, width, height, threshold);
+        let suspicious_regions =
+            self.find_suspicious_regions(&differences, width, height, threshold);
 
         Ok(ElaResult {
             image: ela_image,

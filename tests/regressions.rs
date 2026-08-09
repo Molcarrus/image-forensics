@@ -192,31 +192,46 @@ fn no_analyzer_reports_regions_outside_the_image() {
     let image = textured(width, height);
 
     assert_in_bounds(
-        &ElaAnalyzer::new(95).analyze(&image).unwrap().suspicious_regions,
+        &ElaAnalyzer::new(95)
+            .analyze(&image)
+            .unwrap()
+            .suspicious_regions,
         width,
         height,
         "ela",
     );
     assert_in_bounds(
-        &NoiseAnalyzer::new().analyze(&image).unwrap().anomalous_regions,
+        &NoiseAnalyzer::new()
+            .analyze(&image)
+            .unwrap()
+            .anomalous_regions,
         width,
         height,
         "noise",
     );
     assert_in_bounds(
-        &BenfordAnalyzer::new().analyze(&image).unwrap().anomalous_regions,
+        &BenfordAnalyzer::new()
+            .analyze(&image)
+            .unwrap()
+            .anomalous_regions,
         width,
         height,
         "benford",
     );
     assert_in_bounds(
-        &DctAnalyzer::new().analyze(&image).unwrap().anomalous_regions,
+        &DctAnalyzer::new()
+            .analyze(&image)
+            .unwrap()
+            .anomalous_regions,
         width,
         height,
         "dct",
     );
     assert_in_bounds(
-        &ResamplingDetector::new().detect(&image).unwrap().resampled_regions,
+        &ResamplingDetector::new()
+            .detect(&image)
+            .unwrap()
+            .resampled_regions,
         width,
         height,
         "resampling",
@@ -309,31 +324,52 @@ fn every_reported_probability_is_a_probability() {
     let scores = [
         (
             "benford",
-            BenfordAnalyzer::new().analyze(&image).unwrap().manipulation_probability,
+            BenfordAnalyzer::new()
+                .analyze(&image)
+                .unwrap()
+                .manipulation_probability,
         ),
         (
             "pca",
-            PcaAnalyzer::new().analyze(&image).unwrap().manipulation_probability,
+            PcaAnalyzer::new()
+                .analyze(&image)
+                .unwrap()
+                .manipulation_probability,
         ),
         (
             "prnu",
-            PrnuAnalyzer::new().analyze(&image).unwrap().manipulation_probability,
+            PrnuAnalyzer::new()
+                .analyze(&image)
+                .unwrap()
+                .manipulation_probability,
         ),
         (
             "cfa",
-            CfaAnalyzer::new().analyze(&image).unwrap().manipulation_probability,
+            CfaAnalyzer::new()
+                .analyze(&image)
+                .unwrap()
+                .manipulation_probability,
         ),
         (
             "shadow",
-            ShadowAnalyzer::new().analyze(&image).unwrap().manipulation_probability,
+            ShadowAnalyzer::new()
+                .analyze(&image)
+                .unwrap()
+                .manipulation_probability,
         ),
         (
             "histogram",
-            HistogramAnalyzer::new().analyze(&image).unwrap().manipulation_probability,
+            HistogramAnalyzer::new()
+                .analyze(&image)
+                .unwrap()
+                .manipulation_probability,
         ),
         (
             "resampling",
-            ResamplingDetector::new().detect(&image).unwrap().resampling_probability,
+            ResamplingDetector::new()
+                .detect(&image)
+                .unwrap()
+                .resampling_probability,
         ),
         (
             "chromatic",
@@ -344,11 +380,17 @@ fn every_reported_probability_is_a_probability() {
         ),
         (
             "dct",
-            DctAnalyzer::new().analyze(&image).unwrap().double_compression_probability,
+            DctAnalyzer::new()
+                .analyze(&image)
+                .unwrap()
+                .double_compression_probability,
         ),
         (
             "jpeg",
-            JpegAnalyzer::new().analyze(&image).unwrap().double_compression_likelihood,
+            JpegAnalyzer::new()
+                .analyze(&image)
+                .unwrap()
+                .double_compression_likelihood,
         ),
     ];
 
@@ -405,7 +447,10 @@ fn copy_move_finds_a_planted_duplicate_and_ignores_flat_input() {
     assert!((0.0..=1.0).contains(&planted.confidence));
 
     let clean = detector.detect(&flat(256, 256)).unwrap();
-    assert!(clean.matches.is_empty(), "flat image produced false matches");
+    assert!(
+        clean.matches.is_empty(),
+        "flat image produced false matches"
+    );
 }
 
 // ------------------------------------------------------------------ metadata --

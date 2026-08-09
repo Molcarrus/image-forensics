@@ -4,6 +4,18 @@ use image::{DynamicImage, GrayImage, Luma, RgbImage};
 
 use crate::{JpegAnalysisResult, error::Result, image_utils::rgb_to_gray};
 
+/// JPEG quality estimation, ghost detection and blocking analysis.
+///
+/// One sweep of recompressions at qualities 50 to 100 feeds all of it. A JPEG
+/// ghost is an interior *local* minimum in that curve: the residual otherwise
+/// falls monotonically with quality, so the global minimum tells you nothing.
+///
+/// # Limitations
+///
+/// Double compression is not tampering — every image that has passed through a
+/// messaging app or a social platform has been recompressed. Quality
+/// estimation compares reconstruction error rather than quantisation tables,
+/// so it cannot separate encoders that differ at the same nominal quality.
 pub struct JpegAnalyzer {
     ghost_quality_range: (u8, u8),
     ghost_quality_step: u8,
@@ -12,6 +24,7 @@ pub struct JpegAnalyzer {
 }
 
 impl JpegAnalyzer {
+    /// Analyzer with the default configuration.
     pub fn new() -> Self {
         Self {
             ghost_quality_range: (50, 100),
@@ -20,11 +33,13 @@ impl JpegAnalyzer {
         }
     }
 
+    /// Minimum relative dip in the recompression curve to call a ghost.
     pub fn with_ghost_prominence(mut self, prominence: f64) -> Self {
         self.ghost_prominence = prominence;
         self
     }
 
+    /// Run the analysis. Accepts any image size.
     pub fn analyze(&self, image: &DynamicImage) -> Result<JpegAnalysisResult> {
         let rgb = image.to_rgb8();
         let gray = rgb_to_gray(&rgb);
@@ -198,7 +213,9 @@ impl JpegAnalyzer {
         let mut strongest: f64 = 0.0;
 
         for i in 1..sweep.len() - 1 {
-            let shoulder = sweep[i - 1].mean_difference.min(sweep[i + 1].mean_difference);
+            let shoulder = sweep[i - 1]
+                .mean_difference
+                .min(sweep[i + 1].mean_difference);
             if shoulder <= 0.0 {
                 continue;
             }
@@ -228,8 +245,8 @@ impl JpegAnalyzer {
 
         for y in 0..height {
             for x in 1..width {
-                let diff = (gray.get_pixel(x - 1, y)[0] as f64 - gray.get_pixel(x, y)[0] as f64)
-                    .abs();
+                let diff =
+                    (gray.get_pixel(x - 1, y)[0] as f64 - gray.get_pixel(x, y)[0] as f64).abs();
 
                 if x % 8 == 0 {
                     on_grid += diff;

@@ -7,21 +7,33 @@ use crate::{
     region::merge_regions,
 };
 
+/// Settings for [`CfaAnalyzer`].
 #[derive(Debug, Clone)]
 pub struct CfaConfig {
+    /// Tile size, swept at 50% overlap. Default 32.
     pub block_size: u32,
+    /// Sets `matches_expected` on each measurement. Does not affect the dominant-pattern search.
     pub expected_pattern: CfaPattern,
+    /// A tile must disagree with the dominant pattern and exceed this confidence to be flagged.
     pub mismatch_threshold: f64,
+    /// Flat tiles are skipped: there is no interpolation structure to read.
     pub min_variance: f64,
+    /// Whether to measure zipper artifacts.
     pub detect_interpolation: bool,
 }
 
+/// A Bayer colour filter arrangement.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum CfaPattern {
+    /// Red, green / green, blue.
     RGGB,
+    /// Blue, green / green, red.
     BGGR,
+    /// Green, red / blue, green.
     GRBG,
+    /// Green, blue / red, green.
     GBRG,
+    /// No arrangement could be determined.
     Unknown,
 }
 
@@ -37,51 +49,95 @@ impl Default for CfaConfig {
     }
 }
 
+/// One tile's verdict on which Bayer pattern it carries.
 #[derive(Debug, Clone)]
 pub struct CfaMeasurement {
+    /// Tile origin, x.
     pub x: u32,
+    /// Tile origin, y.
     pub y: u32,
+    /// Best-scoring Bayer arrangement for this tile.
     pub detected_pattern: CfaPattern,
+    /// Margin between the best and second-best pattern, in `[0, 1]`.
     pub confidence: f64,
+    /// Mean zipper-artifact magnitude over the tile.
     pub interpolation_strength: f64,
+    /// Whether `detected_pattern` equals the configured expectation.
     pub matches_expected: bool,
 }
 
+/// Output of [`CfaAnalyzer`].
 #[derive(Debug, Clone)]
 pub struct CfaAnalysisResult {
+    /// Per-tile verdicts.
     pub measurements: Vec<CfaMeasurement>,
+    /// Arrangement the most tiles agreed on.
     pub dominant_pattern: CfaPattern,
+    /// Winning share of the vote, in `[0, 1]`.
     pub pattern_confidence: f64,
+    /// Demosaicing zipper artifacts, strongest along fine detail.
     pub artifact_map: GrayImage,
+    /// Bright where a tile disagrees with the dominant pattern.
     pub consistency_map: GrayImage,
+    /// Confidently disagreeing tiles, merged.
     pub inconsistent_regions: Vec<SRegion>,
+    /// Share of tiles matching the dominant pattern, in `[0, 1]`.
     pub consistency_score: f64,
+    /// Combined coverage, consistency and diversity score, in `[0, 1]`.
     pub manipulation_probability: f64,
+    /// Vote counts per arrangement.
     pub pattern_stats: CfaPatternStats,
 }
 
+/// How many tiles voted for each Bayer arrangement.
 #[derive(Debug, Clone, Default)]
 pub struct CfaPatternStats {
+    /// Tiles voting RGGB.
     pub rggb_count: usize,
+    /// Tiles voting BGGR.
     pub bggr_count: usize,
+    /// Tiles voting GRBG.
     pub grbg_count: usize,
+    /// Tiles voting GBRG.
     pub gbrg_count: usize,
+    /// Tiles with no discernible arrangement.
     pub unknown_count: usize,
 }
 
+/// Colour filter array demosaicing traces.
+///
+/// A single-sensor camera captures one colour per photosite and interpolates
+/// the rest, leaving a periodic 2x2 correlation structure across the frame.
+/// This scores each tile against the four Bayer arrangements and flags tiles
+/// that confidently disagree with the dominant one.
+///
+/// # Limitations
+///
+/// The strongest caveat in this crate: the trace is recovered from an already
+/// demosaiced RGB image using colour-ratio heuristics, not from raw sensor
+/// data. Any resize destroys it, as does most JPEG compression and all
+/// multi-frame computational photography. Treat a negative as uninformative.
 pub struct CfaAnalyzer {
     config: CfaConfig,
 }
 
 impl CfaAnalyzer {
+    /// Analyzer with the default configuration.
     pub fn new() -> Self {
         Self::with_config(CfaConfig::default())
     }
 
+    /// Analyzer with custom settings.
     pub fn with_config(config: CfaConfig) -> Self {
         Self { config }
     }
 
+    /// Run the analysis.
+    ///
+    /// # Errors
+    ///
+    /// [`ImageTooSmall`](crate::error::ForensicsError::ImageTooSmall) below
+    /// twice `block_size`.
     pub fn analyze(&self, image: &DynamicImage) -> Result<CfaAnalysisResult> {
         let rgb = image.to_rgb8();
         let (width, height) = rgb.dimensions();

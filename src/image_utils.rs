@@ -1,3 +1,12 @@
+//! Pixel primitives shared by every analysis module.
+//!
+//! Block iteration, gradients, statistics and colour conversion live here
+//! rather than in the modules. Several long-lived bugs came from divergent
+//! private copies of these — one module's Sobel had an inverted sign, and the
+//! hand-rolled `0..height - block_size` loops underflowed on small images.
+//! Prefer [`full_blocks`] and [`clipped_blocks`] over subtracting a block size
+//! from a dimension.
+
 use image::{GrayImage, Luma, RgbImage};
 use ndarray::Array2;
 
@@ -127,6 +136,7 @@ pub fn u8_to_angle(value: u8) -> f64 {
     (value as f64 / 255.0) * 2.0 * PI - PI
 }
 
+/// Copy a grayscale image into a 2-D `f64` array, row-major.
 pub fn gray_to_array(image: &GrayImage) -> Array2<f64> {
     let (width, height) = image.dimensions();
     let mut arr = Array2::zeros((height as usize, width as usize));
@@ -138,6 +148,7 @@ pub fn gray_to_array(image: &GrayImage) -> Array2<f64> {
     arr
 }
 
+/// Render a 2-D `f64` array back to 8-bit grayscale, clamping to `0..=255`.
 pub fn array_to_gray(arr: &Array2<f64>) -> GrayImage {
     let (height, width) = arr.dim();
     let mut image = GrayImage::new(width as u32, height as u32);
@@ -152,6 +163,7 @@ pub fn array_to_gray(arr: &Array2<f64>) -> GrayImage {
     image
 }
 
+/// 3x3 Gaussian blur with edge replication.
 pub fn gaussian_blur_3x3(image: &GrayImage) -> GrayImage {
     let kernel = [
         [1.0 / 16.0, 2.0 / 16.0, 1.0 / 16.0],
@@ -189,6 +201,7 @@ pub fn convolve_gray(image: &GrayImage, kernel: &[[f64; 3]; 3]) -> GrayImage {
     result
 }
 
+/// 256-bin intensity histogram.
 pub fn calculate_histogram(image: &GrayImage) -> [u32; 256] {
     let mut histogram = [0u32; 256];
 
@@ -199,6 +212,9 @@ pub fn calculate_histogram(image: &GrayImage) -> [u32; 256] {
     histogram
 }
 
+/// Rescale an array so its range spans `0.0..=255.0`.
+///
+/// Returns all zeros when the input is constant.
 pub fn normalize_to_u8(arr: &Array2<f64>) -> Array2<f64> {
     let min = arr.iter().cloned().fold(f64::INFINITY, f64::min);
     let max = arr.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
@@ -236,6 +252,7 @@ pub fn extract_block(image: &GrayImage, x: u32, y: u32, size: u32) -> Vec<u8> {
     block
 }
 
+/// Mean intensity of a block. Zero for an empty slice.
 pub fn block_mean(block: &[u8]) -> f64 {
     if block.is_empty() {
         return 0.0;
@@ -243,6 +260,7 @@ pub fn block_mean(block: &[u8]) -> f64 {
     block.iter().map(|&v| v as f64).sum::<f64>() / block.len() as f64
 }
 
+/// Population variance of a block. Zero for an empty slice.
 pub fn block_variance(block: &[u8]) -> f64 {
     if block.is_empty() {
         return 0.0;

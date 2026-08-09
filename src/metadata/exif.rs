@@ -7,6 +7,10 @@ use crate::{
     error::{ForensicsError, Result},
 };
 
+/// Reads the EXIF block of an image file into a [`MetadataResult`].
+///
+/// A unit struct: [`extract`](Self::extract) is an associated function and
+/// there is no state to configure.
 pub struct ExifExtractor;
 
 impl ExifExtractor {
@@ -91,11 +95,12 @@ impl ExifExtractor {
         // Capture and digitisation legitimately differ for scanned film, so
         // report the discrepancy as context rather than as evidence.
         if let (Some(original), Some(digitized)) = (&datetime_original, &datetime_digitized)
-            && original != digitized {
-                suspicious_indicators.push(format!(
-                    "DateTimeOriginal ({original}) differs from DateTimeDigitized ({digitized})"
-                ));
-            }
+            && original != digitized
+        {
+            suspicious_indicators.push(format!(
+                "DateTimeOriginal ({original}) differs from DateTimeDigitized ({digitized})"
+            ));
+        }
 
         if camera_make.is_none() && camera_model.is_none() && !all_tags.is_empty() {
             suspicious_indicators.push("Camera make and model absent from EXIF".into());

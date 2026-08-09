@@ -1,23 +1,32 @@
 use image::{DynamicImage, GrayImage, Rgb, RgbImage};
 
 use crate::{
-    SRegion, draw,
+    SRegion,
     analysis::{copy_move::CopyMoveDetector, jpeg_analysis::JpegAnalyzer},
     detection::{
         ConfidenceLevel, DetectedManipulation, DetectionResult, Detector, ManipulationType,
         splicing::SplicingDetector,
     },
+    draw,
     error::Result,
     image_utils::{clipped_blocks, mean_and_variance, rgb_to_gray},
 };
 
+/// Settings for [`TamperingDetector`].
 #[derive(Debug, Clone)]
 pub struct TamperingConfig {
+    /// Run copy-move detection.
     pub detect_copy_move: bool,
+    /// Run the full splicing detector, which itself runs ELA and noise.
     pub detect_splicing: bool,
+    /// Run the texture and blur consistency checks.
     pub detect_retouching: bool,
+    /// Tile size, forwarded to copy-move.
     pub block_size: u32,
+    /// Multiplies the retouching z-score cutoffs, so a **lower** value produces
+    /// **more** detections — the opposite of what the name suggests.
     pub sensitivity: f64,
+    /// Retouching findings below this confidence are dropped.
     pub min_confidence: f64,
 }
 
@@ -34,17 +43,31 @@ impl Default for TamperingConfig {
     }
 }
 
+/// The broadest composite detector: copy-move, splicing, retouching and
+/// double compression in one pass.
+///
+/// Use it for a first look at an unfamiliar image, then reach for the
+/// individual modules once you know what you are chasing.
+///
+/// # Limitations
+///
+/// The slowest path in the crate — it runs copy-move, the splicing detector
+/// (which runs ELA and noise internally) and a full JPEG sweep. `overall_score`
+/// averages, so many weak retouching findings will dilute one strong copy-move
+/// detection.
 pub struct TamperingDetector {
     config: TamperingConfig,
 }
 
 impl TamperingDetector {
+    /// Detector with the default configuration.
     pub fn new() -> Self {
         Self {
             config: TamperingConfig::default(),
         }
     }
 
+    /// Detector with custom settings.
     pub fn with_config(config: TamperingConfig) -> Self {
         Self { config }
     }
@@ -114,8 +137,7 @@ impl TamperingDetector {
                     0.0
                 };
 
-                (z_score > 2.0 * self.config.sensitivity)
-                    .then(|| (block, (z_score / 5.0).min(1.0)))
+                (z_score > 2.0 * self.config.sensitivity).then(|| (block, (z_score / 5.0).min(1.0)))
             })
             .collect()
     }
@@ -179,8 +201,7 @@ impl TamperingDetector {
                     0.0
                 };
 
-                (z_score > 2.5 * self.config.sensitivity)
-                    .then(|| (block, (z_score / 5.0).min(1.0)))
+                (z_score > 2.5 * self.config.sensitivity).then(|| (block, (z_score / 5.0).min(1.0)))
             })
             .collect()
     }
@@ -261,13 +282,24 @@ impl TamperingDetector {
                 _ => Rgb([0, 255, 255]),
             };
 
-            self.draw_detection(&mut vis, &manipulation.region, color, manipulation.confidence);
+            self.draw_detection(
+                &mut vis,
+                &manipulation.region,
+                color,
+                manipulation.confidence,
+            );
         }
 
         vis
     }
 
-    fn draw_detection(&self, image: &mut RgbImage, region: &SRegion, color: Rgb<u8>, confidence: f64) {
+    fn draw_detection(
+        &self,
+        image: &mut RgbImage,
+        region: &SRegion,
+        color: Rgb<u8>,
+        confidence: f64,
+    ) {
         let thickness = (confidence * 4.0) as u32 + 1;
 
         draw::fill(image, region, color, (confidence * 0.3) as f32);
@@ -370,11 +402,21 @@ mod tests {
     fn detected_regions_stay_within_the_image() {
         // 100 is not a multiple of the 16 px block size, so the trailing blocks
         // are clipped; the blur sweep used to report over-tall regions here.
-        let result = TamperingDetector::new().detect(&textured(100, 100)).unwrap();
+        let result = TamperingDetector::new()
+            .detect(&textured(100, 100))
+            .unwrap();
 
         for manipulation in &result.manipulations {
-            assert!(manipulation.region.right() <= 100, "{:?}", manipulation.region);
-            assert!(manipulation.region.bottom() <= 100, "{:?}", manipulation.region);
+            assert!(
+                manipulation.region.right() <= 100,
+                "{:?}",
+                manipulation.region
+            );
+            assert!(
+                manipulation.region.bottom() <= 100,
+                "{:?}",
+                manipulation.region
+            );
         }
     }
 

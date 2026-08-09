@@ -21,6 +21,9 @@ previous revisions**, in most cases because the previous results were wrong.
 - `SRegion` moved to the `region` module. It is re-exported from the crate root,
   so `image_forensics::SRegion` still resolves.
 - `JpegAnalysisResult` gained a `ghost_quality: Option<u8>` field.
+- `Visualizer::visulaize_full_analysis` renamed to `visualize_full_analysis`.
+- Every public item now carries a doc comment; the crate builds under
+  `#![warn(missing_docs)]`. Run `cargo doc --open` for the API reference.
 - Private typos corrected: `weiner_filter`, `find_incosistent_regions`,
   `find_anomlaies`, `calculate_laplcaian_variance`,
   `calculate_mainpulation_probability`, `create_abberation_map`.
